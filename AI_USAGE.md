@@ -18,6 +18,10 @@ Codex generated the initial TypeScript/React/Fastify scaffold, SQLite migration,
 
 Codex initially chose a TypeScript backend because the stack was undecided. The developer requested Python before the first commit. Codex replaced Fastify with FastAPI, moved domain validation to Pydantic and tests to pytest, and retained the SQLite schema and React frontend. The initial default caused avoidable rework; the developer's language preference is more important than sharing one language across the stack.
 
+## Example 5 — Latest-review filtering and cross-language contracts
+
+Codex implemented SQL that selects each snippet's latest review before filtering by status, and added a regression test where an old success is followed by a failure at the same timestamp. Frontend types are generated from FastAPI OpenAPI rather than independently maintained. The generator rejected the initial TypeScript 7 dependency; Codex switched to the generator's supported TypeScript 5 instead of bypassing the peer-dependency check. This compatibility issue took extra work and illustrates why generated scaffolds still need integration checks.
+
 ## Overall assessment — provisional
 
 AI helped translate requirements into a concrete schema and connected scaffold quickly. The unconfirmed backend default caused rework. Generated configuration still required review for cross-file consistency, as the port mismatch illustrates. No measured time saving is claimed. Add observed LLM-integration and UI examples, and the developer's own assessment, before final submission.

@@ -2,7 +2,7 @@
 
 A local React application for submitting code snippets to an LLM and resolving individual review findings.
 
-**Current milestone: step 1, project foundation and data contracts.** The startup page checks the API and persistent SQLite database. Snippet CRUD, AI calls, review execution, and finding interactions are not implemented yet.
+**Current milestone: step 2, snippet management.** Create snippets, browse the dashboard, filter by language/review status, and open read-only code with syntax highlighting and line numbers. AI calls, review execution, and finding interactions are not implemented yet.
 
 ## Run locally
 
@@ -31,6 +31,7 @@ Then open http://127.0.0.1:3001. The Python API serves the built React applicati
 | `npm run setup` | Install Node and Python dependencies from lockfiles |
 | `npm run dev` | React development server and API with reload |
 | `npm run db:migrate` | Initialize or migrate the file database explicitly |
+| `npm run api:types` | Regenerate frontend types from the Python API schema |
 | `npm run typecheck` | Check frontend TypeScript |
 | `npm test` | Database, validation, and API foundation tests |
 | `npm run build` | Typecheck and build frontend |
@@ -44,7 +45,7 @@ React + TypeScript + Vite ── /api ── FastAPI + Pydantic ── SQLite fi
 ```
 
 - React with TypeScript handles the client; Python with FastAPI handles the API, following the developer's backend preference. Vite handles frontend development and builds.
-- FastAPI exposes the implemented API schema at `/openapi.json` and interactive docs at `/docs`. Pydantic is the source of truth for backend domain validation. Frontend types can be generated from OpenAPI as business endpoints are added; the current frontend only validates the small health response.
+- FastAPI exposes the implemented API schema at `/openapi.json` and interactive docs at `/docs`. Pydantic is the source of truth for backend domain validation. Frontend API types are generated from OpenAPI with `npm run api:types` and committed in `src/shared/api-types.ts`. Regenerate them after changing endpoint models.
 - SQLite uses Python's standard `sqlite3` module, avoiding a separate database service and native Node addons. Connections are scoped to each request; synchronous database work runs in regular FastAPI handlers.
 - Numbered SQL migrations are transactional and recorded with checksums. Applied migrations are immutable; add a new file for a schema change.
 - `Snippet`, `ReviewRun`, and `Finding` have separate persistence and lifecycles. A partial unique index prevents two active reviews for one snippet, even across database connections.
@@ -60,7 +61,16 @@ See [data and API contracts](docs/data-contract.md) for invariants and planned e
 - Each rerun creates a new review and findings. The latest review drives the dashboard; old resolutions are not copied.
 - Planned background execution is within the local backend process, with persisted status and frontend polling. Restart recovery and retry will be implemented in the review milestone; they do not exist yet.
 - Discussion is pending clarification: the overview mentions it, but the detailed requirements do not define comments versus AI conversation.
-- LLM provider/model, review timeouts, and the supported language picker remain to be selected during their implementation steps.
+- LLM provider/model, review timeouts, and additional language support remain to be selected during their implementation steps.
+
+## Snippet management
+
+- Create a snippet with a title, language, and nonblank code (up to 100,000 Unicode code points). Code is stored without trimming or changing line endings.
+- The language picker supports Python, TypeScript, JavaScript, Go, Rust, Java, C++, SQL, and plain text. Unknown API-submitted languages safely fall back to plain text display.
+- Dashboard filters combine with AND semantics and use the latest review, not an older matching run. The language menu lists languages across the workspace even when filters return no rows.
+- Hash-based routes preserve detail URLs and filters on refresh without requiring SPA fallback rules on the Python static server.
+- Code is escaped by the highlighter and is never executed. Line endings are normalized only for display.
+- Step 2 validation: 16 automated tests, TypeScript/build checks, and browser checks for creation, code highlighting, reload, and filtering.
 
 ## What I would change with more time
 

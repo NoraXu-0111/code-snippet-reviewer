@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal, Self
 from uuid import UUID
@@ -141,3 +140,30 @@ def dashboard_status(status: ReviewStatus | None) -> DashboardStatus:
 class HealthResponse(Contract):
     status: Literal["ok"] = "ok"
     database: Literal["connected"] = "connected"
+
+
+class SnippetSummary(Contract):
+    id: UUID
+    title: str
+    language: str
+    created_at: AwareDatetime
+    review_status: DashboardStatus
+
+
+class SnippetList(Contract):
+    snippets: list[SnippetSummary]
+    languages: list[str]
+
+
+class SnippetDetail(Contract):
+    snippet: Snippet
+    latest_review: ReviewRun | None
+
+
+class ErrorBody(Contract):
+    code: str
+    message: str
+
+
+class ErrorResponse(Contract):
+    error: ErrorBody

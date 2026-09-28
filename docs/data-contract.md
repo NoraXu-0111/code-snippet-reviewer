@@ -10,7 +10,7 @@ IDs are application-generated UUIDs. Timestamps are UTC ISO 8601 strings. API fi
 | ReviewRun | id, snippetId, status, createdAt, startedAt, finishedAt, error |
 | Finding | id, reviewRunId, startLine, endLine, severity, category, description, suggestedFix, resolution |
 
-Limits selected for this MVP: title 1–120 characters, language identifier 1–50, and nonblank code up to 100,000 Unicode code points at the API boundary. The UI language picker will be defined in step 2; storage is not restricted to a language enum.
+Limits selected for this MVP: title 1–120 characters, language identifier 1–50, and nonblank code up to 100,000 Unicode code points at the API boundary. The UI offers Python, TypeScript, JavaScript, Go, Rust, Java, C++, SQL, and plain text; storage is not restricted to a language enum.
 
 Severity: `critical | warning | info`. Category: `bug | style | performance | security`. These values are a project choice based on the assignment examples. `suggestedFix` is nullable text. LLM output omitting it normalizes to `null`.
 
@@ -42,17 +42,17 @@ LLM output is `{ findings: [...] }`. Parse the entire object and check line boun
 
 ## HTTP surface
 
-Only `GET /api/health` is implemented. Response: `{ "status": "ok", "database": "connected" }`.
+`GET /api/health` is implemented. Response: `{ "status": "ok", "database": "connected" }`.
 
-The following are proposed implementation targets, not available endpoints yet:
+The create/list/detail snippet endpoints below are implemented. Review and finding mutation endpoints remain planned.
 
 | Method | Path | Contract |
 | --- | --- | --- |
 | POST | /api/snippets | `{ title, language, code }` -> 201 Snippet |
-| GET | /api/snippets | Optional `language`, `reviewStatus`; -> `{ snippets: [...] }`, each with latest review status |
+| GET | /api/snippets | Optional `language`, `reviewStatus`; -> `{ snippets: [...], languages: [...] }`; latest review status per row; languages across the workspace |
 | GET | /api/snippets/:id | -> `{ snippet, latestReview: ReviewRun \| null }` |
 | POST | /api/snippets/:id/reviews | -> 202 ReviewRun; 409 if an active review exists |
 | GET | /api/reviews/:id | -> `{ review, findings }`; polling source |
 | PATCH | /api/findings/:id | `{ resolution }` -> updated Finding |
 
-Planned error envelope: `{ error: { code, message } }`. Validation failures use 400, unknown IDs use 404, and an already active review uses 409. Unexpected server failures use 500 with a safe message. Provider failures are recorded on the asynchronous review and returned through the review endpoint. No provider SDK or key is bundled into the browser.
+Error envelope: `{ error: { code, message } }`. Validation failures use 400, unknown IDs use 404, and an already active review uses 409. Unexpected server failures use 500 with a safe message. Provider failures are recorded on the asynchronous review and returned through the review endpoint. No provider SDK or key is bundled into the browser.

@@ -138,5 +138,5 @@ def test_api_startup_and_health(tmp_path):
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "database": "connected"}
         assert filename.is_file()
-        assert client.get("/api/snippets").status_code == 404
+        assert client.get("/api/missing").status_code == 404
         assert "/api/health" in client.get("/openapi.json").json()["paths"]
