@@ -159,3 +159,20 @@ The 56-test suite includes mocked discussion/provider checks for follow-up histo
 ## Model-call diagnostics
 
 `003_model_calls.sql` adds local call spans, keyed by operation, subject ID and attempt. They intentionally do not contain code, prompt bodies, user messages, assistant text or exception bodies. Model-call spans are diagnostic records rather than review/finding state; timing excludes queue wait. See [quality.md](quality.md#local-model-call-tracing) for fields, failure behavior, commands and limitations.
+
+
+## Human evaluation annotations
+
+This is an evaluation workflow separate from product finding resolution. Migration `004_quality_annotations.sql` adds `quality_sessions` and append-only `quality_annotations`. A session identifies a reviewer name and source hash, stores immutable copies of the dataset, report and normalized case/run outputs, and retains their hashes. `(source_id, reviewer)` is unique; starting the same session resumes it. A reviewer name is not an authenticated identity.
+
+Each case annotation records independent observations, visible/unknown input assumptions, reference verdict/reason, proposed reference corrections, per-run/per-finding judgments, and per-run coverage/reasons. Case membership and run/finding indexes are checked against the frozen source, not mutable files. Drafts can be partial. Completing requires every judgment and supporting reason, but permits uncertainty. Missing suggestions require a Not applicable fix rating; failed calls cannot be marked as successful coverage. Reference corrections remain separate from original labels and require explicit future adjudication.
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | /api/quality/catalog | Available built-in/local result sources, unavailable snapshots and saved session progress |
+| POST | /api/quality/sessions | `{sourceId, reviewer}` creates/resumes a frozen annotation session |
+| GET | /api/quality/sessions/:id | Frozen cases/results plus latest saved annotations |
+| PUT | /api/quality/sessions/:id/cases/:caseId | Replace this case's assessment with `{revision, status, ...}`; append a new revision |
+| GET | /api/quality/sessions/:id/export | Download original evidence, metadata, latest annotations and all revision history |
+
+Writes use a transaction and compare the client's revision with the latest stored revision (initial revision 0). A stale write returns 409 without changing prior records. All completed fields are validated server-side. Browser drafts are tab-local recovery only; exports contain saved revisions. Export reads the history and current state from one SQLite snapshot. No evaluation annotation makes a provider call, edits source code, changes a product finding's acceptance, mutates reference files, or automatically converts heuristic scores into human accuracy metrics. OpenAPI-derived types cover the annotation contracts.

@@ -15,6 +15,7 @@ from .contracts import CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, R
 from .database import open_database
 from .tracing import recover_traces
 from . import findings, snippets
+from .quality import quality_router
 from .reviewer import OpenAIReviewer, Reviewer
 from .reviews import ActiveReviewError, ReviewService, get_review
 from .discussion_provider import DiscussionProvider, OpenAIDiscussionProvider
@@ -165,6 +166,8 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
             return app.state.discussions.retry(turn_id, payload.attempt)
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from None
+
+    app.include_router(quality_router(settings))
 
     if settings.serve_client:
         app.mount("/", StaticFiles(directory=PROJECT_ROOT / "dist/client", html=True), name="client")

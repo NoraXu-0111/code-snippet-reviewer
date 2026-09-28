@@ -53,7 +53,7 @@ Codex inspected the candidate descriptions and suggestions, not just the metric 
 
 ## Manual grading rubric
 
-For each case, read the source and expected issue before evaluating the output. Record the finding index, verdict, and a short reason in a review note (for example `work/evals/<run>/manual-review.md`).
+For each case, first inspect the code without reading the proposed reference or model output. Record your observations and explicit/unknown input assumptions, then reveal and validate the reference, and finally assess the model outputs. Use the local Human review workspace below to persist judgments and evidence.
 
 | Dimension | Questions |
 | --- | --- |
@@ -66,6 +66,23 @@ For each case, read the source and expected issue before evaluating the output. 
 | Stability | Do repeated runs preserve the same substantive decisions? Investigate disagreement instead of selecting the best run. |
 
 Next quality work should add independently labeled, representative/held-out cases and pairwise human comparisons. Expand languages, correct code, ambiguous contracts, multiple interacting issues, and longer snippets before drawing broader conclusions. Accept/dismiss is a workflow decision; it is not automatically ground truth.
+
+## Human annotation workspace
+
+Open `http://127.0.0.1:5173/#/quality` (or `/#/quality` on the production server). The header's **Human review** link also opens it. No API key or provider call is needed to annotate existing results.
+
+1. Choose **candidate-v2**, enter your reviewer name, and select **Start / resume review**. The same name and source resume the same session. Different names create separate assessments; this is a local name label, not authentication.
+2. Pick a case in the sidebar. Start with `off-by-one` if you want a small, concrete example. Inspect the source and record **Your observations and evidence** and **Input / behavior assumptions**. A minimal input/result or execution trace is useful. Do not run arbitrary generated fixes automatically.
+3. **Reveal proposed reference**. Choose **Approved**, **Needs changes**, or **Uncertain**, and explain why. For **Needs changes**, write the corrected issues, line ranges, impact and valid fix direction in **Proposed reference changes** (or explicitly propose no issues). Approval means supported by the context the model actually saw. Unknown empty-input behavior is a valid reason for uncertainty. References and their private notes were not sent to the model.
+4. **Reveal model outputs**. For each run, mark every finding **Correct**, **Incorrect**, **Uncertain**, or **Duplicate**, then rate line location, severity, and fix usefulness. Add evidence and explain rating problems. Use **Not applicable** for a missing fix. Assess **Coverage** even when no findings were returned; record missed issues and affected lines, explain correct silence, or mark uncertainty. A valid extra finding can expose an incomplete reference. A failed call is always a failed assessment of coverage, never a clean review.
+5. Use **Save draft** whenever pausing, or **Complete & next case** after every dimension and reason is filled. The v2 report contains 10 cases and 20 outputs (two runs per case). Runs must be assessed separately. Completion means the assessment is filled, not that the reference is approved; uncertainty is allowed.
+6. **Export saved annotations** downloads JSON containing original dataset/report snapshots, hashes and report metadata, your latest labels, reviewer name, and every saved revision. Keep or share this file for adjudication. The export excludes unsaved browser drafts. **Download this draft** can rescue one unsaved case before resolving a conflict.
+
+Saved sessions and append-only annotation revisions live in the app's local SQLite database (`data/reviewer.db`, ignored by Git). Reloading or restarting preserves saved work. When browser storage is available, unsaved drafts survive switching cases and reloading in the same tab; they are not a durable substitute for **Save draft** and may disappear when that tab closes. Unavailable browser storage displays a warning. Conflicting writes return 409 without overwriting the newer annotation. Download/copy your draft before choosing **Load saved version**.
+
+Sources include the committed v1/v2/v3 reports and `work/evals/*/results.json` with matching adjacent `dataset.json` snapshots. Committed reports require the current `evals/cases.json` bytes to match their dataset hash; mismatches are listed as unavailable rather than silently assigning old outputs to new code. Creating a session freezes the source and labels; existing sessions remain readable if the files later change or disappear. No automatic call, source/finding modification, reference promotion, or gold-accuracy calculation happens here. Proposed reference changes remain human notes until deliberately adjudicated and versioned. If a correction changes the code or input contract visible to the model, rerun the revised case instead of grading the old output against hidden requirements.
+
+This workspace supports a single reviewer's judgments per named session, not consensus adjudication or a held-out benchmark. After checking these development cases, create independent held-out cases before making an accuracy claim. Existing automatic heuristic scores are unchanged by annotations.
 
 ## Local model-call tracing
 

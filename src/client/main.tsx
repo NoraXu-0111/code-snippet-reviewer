@@ -14,6 +14,7 @@ import type { Finding } from "./api";
 import { ReviewPanel } from "./ReviewPanel";
 import { Discussion } from "./Discussion";
 import { examples } from "./examples";
+import { QualityHome, QualitySession } from "./QualityReview";
 import {
   formatDate,
   languageLabel,
@@ -575,12 +576,16 @@ function App() {
           </span>{" "}
           Snippet Reviewer
         </Link>
-        <span className="workspace-label">Local workspace</span>
+        <Link className="workspace-label" to="/quality">
+          Human review
+        </Link>
       </header>
       <main>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/new" element={<NewSnippet />} />
+          <Route path="/quality" element={<QualityHome />} />
+          <Route path="/quality/:id" element={<QualitySession />} />
           <Route path="/snippets/:id" element={<Detail />} />
           <Route
             path="*"

@@ -22,4 +22,6 @@ Final verification and a short demo are recorded in [verification.md](verificati
 11. **Quality evaluation and local tracing (completed):** versioned fixed fixtures/prompts, opt-in live runner, transparent candidate grading, saved results and rubric, safe model-call metadata.
 12. **Repeatable browser regression (completed):** five real-API workflows at desktop and narrow widths, isolated SQLite and deterministic providers, failure screenshots/action traces.
 
+13. **Human annotation workflow (completed):** staged independent inspection/reference validation/output assessment, frozen evaluation evidence, persisted drafts and revision conflicts, progress and full JSON export. No automatic promotion to gold labels or new provider calls.
+
 These improvements were explicitly requested after the original MVP. They are additional scope, not a claim that the original time estimate included all of this work.

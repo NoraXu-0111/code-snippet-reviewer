@@ -143,15 +143,166 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/quality/catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Catalog */
+    get: operations["catalog_api_quality_catalog_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/quality/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create Session */
+    post: operations["create_session_api_quality_sessions_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/quality/sessions/{session_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Session */
+    get: operations["read_session_api_quality_sessions__session_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/quality/sessions/{session_id}/cases/{case_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Save */
+    put: operations["save_api_quality_sessions__session_id__cases__case_id__put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/quality/sessions/{session_id}/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Export */
+    get: operations["export_api_quality_sessions__session_id__export_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** AnnotationInput */
+    AnnotationInput: {
+      /** Revision */
+      revision: number;
+      /**
+       * Status
+       * @default draft
+       * @enum {string}
+       */
+      status: "draft" | "completed";
+      /**
+       * Independentnotes
+       * @default
+       */
+      independentNotes: string;
+      /**
+       * Contractnotes
+       * @default
+       */
+      contractNotes: string;
+      /**
+       * Referenceverdict
+       * @default pending
+       * @enum {string}
+       */
+      referenceVerdict: "pending" | "approved" | "needs_changes" | "uncertain";
+      /**
+       * Referencenotes
+       * @default
+       */
+      referenceNotes: string;
+      /**
+       * Proposedreference
+       * @default
+       */
+      proposedReference: string;
+      /** Findings */
+      findings?: components["schemas"]["FindingAnnotation"][];
+      /** Coverage */
+      coverage?: components["schemas"]["CoverageAnnotation"][];
+    };
+    /** Catalog */
+    Catalog: {
+      /** Sources */
+      sources: components["schemas"]["SourceInfo"][];
+      /** Sessions */
+      sessions: components["schemas"]["SessionInfo"][];
+      /** Unavailable */
+      unavailable: string[];
+    };
     /**
      * Category
      * @enum {string}
      */
     Category: "bug" | "style" | "performance" | "security";
+    /** CoverageAnnotation */
+    CoverageAnnotation: {
+      /** Runindex */
+      runIndex: number;
+      /**
+       * Verdict
+       * @default pending
+       * @enum {string}
+       */
+      verdict: "pending" | "complete" | "missed" | "uncertain" | "failed";
+      /**
+       * Notes
+       * @default
+       */
+      notes: string;
+    };
     /** CreateDiscussionTurn */
     CreateDiscussionTurn: {
       /** Message */
@@ -248,6 +399,55 @@ export interface components {
       /** @default open */
       resolution: components["schemas"]["Resolution"];
     };
+    /** FindingAnnotation */
+    FindingAnnotation: {
+      /** Runindex */
+      runIndex: number;
+      /** Findingindex */
+      findingIndex: number;
+      /**
+       * Verdict
+       * @default pending
+       * @enum {string}
+       */
+      verdict: "pending" | "correct" | "incorrect" | "uncertain" | "duplicate";
+      /**
+       * Location
+       * @default pending
+       * @enum {string}
+       */
+      location: "pending" | "good" | "problem" | "uncertain" | "not_applicable";
+      /**
+       * Severity
+       * @default pending
+       * @enum {string}
+       */
+      severity: "pending" | "good" | "problem" | "uncertain" | "not_applicable";
+      /**
+       * Fix
+       * @default pending
+       * @enum {string}
+       */
+      fix: "pending" | "good" | "problem" | "uncertain" | "not_applicable";
+      /**
+       * Notes
+       * @default
+       */
+      notes: string;
+    };
+    /** FindingContent */
+    FindingContent: {
+      /** Startline */
+      startLine: number;
+      /** Endline */
+      endLine: number;
+      severity: components["schemas"]["Severity"];
+      category: components["schemas"]["Category"];
+      /** Description */
+      description: string;
+      /** Suggestedfix */
+      suggestedFix?: string | null;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -267,6 +467,46 @@ export interface components {
        * @constant
        */
       database: "connected";
+    };
+    /** NewSession */
+    NewSession: {
+      /** Sourceid */
+      sourceId: string;
+      /** Reviewer */
+      reviewer: string;
+    };
+    /** QualityCase */
+    QualityCase: {
+      /** Id */
+      id: string;
+      /** Language */
+      language: string;
+      /** Code */
+      code: string;
+      /** Expected */
+      expected: {
+        [key: string]: unknown;
+      }[];
+      /** Notes */
+      notes: string;
+      /** Runs */
+      runs: components["schemas"]["QualityRun"][];
+    };
+    /** QualityRun */
+    QualityRun: {
+      /** Index */
+      index: number;
+      /** Repeat */
+      repeat: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "succeeded" | "failed";
+      /** Findings */
+      findings: components["schemas"]["FindingContent"][];
+      /** Errortype */
+      errorType?: string | null;
     };
     /**
      * Resolution
@@ -319,6 +559,84 @@ export interface components {
      * @enum {string}
      */
     ReviewStatus: "queued" | "running" | "succeeded" | "failed";
+    /** SavedAnnotation */
+    SavedAnnotation: {
+      /** Revision */
+      revision: number;
+      /**
+       * Status
+       * @default draft
+       * @enum {string}
+       */
+      status: "draft" | "completed";
+      /**
+       * Independentnotes
+       * @default
+       */
+      independentNotes: string;
+      /**
+       * Contractnotes
+       * @default
+       */
+      contractNotes: string;
+      /**
+       * Referenceverdict
+       * @default pending
+       * @enum {string}
+       */
+      referenceVerdict: "pending" | "approved" | "needs_changes" | "uncertain";
+      /**
+       * Referencenotes
+       * @default
+       */
+      referenceNotes: string;
+      /**
+       * Proposedreference
+       * @default
+       */
+      proposedReference: string;
+      /** Findings */
+      findings?: components["schemas"]["FindingAnnotation"][];
+      /** Coverage */
+      coverage?: components["schemas"]["CoverageAnnotation"][];
+      /** Savedat */
+      savedAt: string;
+    };
+    /** SessionDetail */
+    SessionDetail: {
+      /** Id */
+      id: string;
+      /** Reviewer */
+      reviewer: string;
+      /** Createdat */
+      createdAt: string;
+      source: components["schemas"]["SourceInfo"];
+      /** Datasetsha256 */
+      datasetSha256: string;
+      /** Reportsha256 */
+      reportSha256: string;
+      /** Cases */
+      cases: components["schemas"]["QualityCase"][];
+      /** Annotations */
+      annotations: {
+        [key: string]: components["schemas"]["SavedAnnotation"];
+      };
+    };
+    /** SessionInfo */
+    SessionInfo: {
+      /** Id */
+      id: string;
+      /** Reviewer */
+      reviewer: string;
+      /** Label */
+      label: string;
+      /** Createdat */
+      createdAt: string;
+      /** Completed */
+      completed: number;
+      /** Total */
+      total: number;
+    };
     /**
      * Severity
      * @enum {string}
@@ -376,6 +694,21 @@ export interface components {
        * @enum {string}
        */
       reviewStatus: "not_reviewed" | "in_progress" | "reviewed" | "failed";
+    };
+    /** SourceInfo */
+    SourceInfo: {
+      /** Id */
+      id: string;
+      /** Label */
+      label: string;
+      /** Model */
+      model: string;
+      /** Promptversion */
+      promptVersion: string;
+      /** Casecount */
+      caseCount: number;
+      /** Runcount */
+      runCount: number;
     };
     /** UpdateFinding */
     UpdateFinding: {
@@ -934,6 +1267,157 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  catalog_api_quality_catalog_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Catalog"];
+        };
+      };
+    };
+  };
+  create_session_api_quality_sessions_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NewSession"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SessionDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  read_session_api_quality_sessions__session_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SessionDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_api_quality_sessions__session_id__cases__case_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+        case_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnnotationInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavedAnnotation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_api_quality_sessions__session_id__export_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
