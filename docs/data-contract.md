@@ -1,5 +1,11 @@
 # Data and API contracts
 
+## Scope clarification and design status
+
+The assignment author's clarification, supplied by the developer, says that discussion should ideally be a follow-up conversation with the AI. The developer has agreed to include **per-finding AI conversation** in the MVP. The author accepts either applying fixes or recording acceptance only; this project keeps acceptance as a persisted finding resolution, without changing source code.
+
+The snippet, review, and finding-resolution contracts below are implemented. The conversation design at the end of this document is agreed scope for the next milestone, **not implemented functionality**. It extends the existing React + FastAPI + SQLite application and uses the configured OpenAI provider.
+
 ## Implemented foundation
 
 IDs are application-generated UUIDs. Timestamps are UTC ISO 8601 strings. API fields use camelCase; SQL uses snake_case. One-based line references are inclusive. Submitted code retains its whitespace and line endings.
@@ -56,3 +62,91 @@ All endpoints below are implemented.
 | PATCH | /api/findings/:id | `{ resolution }` -> updated Finding |
 
 Error envelope: `{ error: { code, message } }`. Validation failures use 400, unknown IDs use 404, and an already active review uses 409. Missing OpenAI configuration uses 503 without creating a run. Unexpected server failures use 500 with a safe message. Provider failures are recorded on the asynchronous review and returned through the review endpoint. No provider SDK or key is bundled into the browser.
+
+## Per-finding AI conversation — planned
+
+### User experience and boundaries
+
+- Each finding has a **Discuss** button that expands its conversation inside the finding card. Users can ask for an explanation, an example, a possible false positive, or a revised fix.
+- Show the user's question and the AI's answer in chronological order. Display pending, failed, and retry states alongside the relevant question. Conversation history survives page reloads and application restarts.
+- The composer is disabled while that finding has an active reply. Other findings remain usable, and users can collapse the conversation or navigate away while a reply is being generated.
+- Accept, dismiss, and reopen remain available independently of discussion. Users may discuss resolved findings. Sending a message does not change resolution, and changing resolution does not clear history.
+- AI responses are explanations and suggestions only. They cannot edit source code, change the original finding, change review status, or accept/dismiss on the user's behalf. Display answer text with preserved whitespace; rich Markdown and streaming are outside this milestone.
+- Re-review creates new findings with empty conversations. Old conversations remain attached to their original finding and review. No conversation is copied or matched across runs; a historical-review browser remains out of scope.
+
+### Data ownership and persistence
+
+```text
+Snippet
+  └─ ReviewRun
+       └─ Finding
+            └─ DiscussionTurn (one user question + one AI reply attempt)
+```
+
+One finding has one implicit conversation. Add a `discussion_turns` table through a new migration; do not change applied migrations. A separate conversation/session table is unnecessary for this scope.
+
+Persist each question and its reply together as a turn, rather than storing an unpaired user message and assistant message. This gives the reply a clear execution state and makes retries possible without duplicating the visible question. The UI projects a turn into user/assistant chat bubbles.
+
+| Field | Contract |
+| --- | --- |
+| id | Server-generated UUID |
+| findingId | Foreign key to the owning finding; required |
+| clientRequestId | Client-generated UUID for idempotent submission |
+| userMessage | Nonblank question, up to 4,000 Unicode code points |
+| assistantMessage | Nullable plain text; required and nonblank only on success |
+| status | `queued`, `running`, `succeeded`, or `failed` |
+| attempt | Positive integer, initially 1; increments on an explicit retry |
+| createdAt | Creation time of the original question; unchanged by retry |
+| startedAt / finishedAt | Timestamps for the current attempt |
+| error | Safe user-facing error text on failure; otherwise null |
+
+Invariants:
+
+- A partial unique index on `finding_id` permits at most one queued/running turn per finding. A unique constraint on `(finding_id, client_request_id)` prevents duplicate submissions.
+- Repeating the same request ID with the same question returns the existing turn without another provider call. Reusing it with different text returns 409. The client preserves its request ID after an uncertain network result and uses a new one for a new question.
+- Use the review state-shape rules for timestamps/errors. Successful turns have an answer and no error; queued/running/failed turns have no answer. An empty or missing AI answer is a failure, not a completed chat turn.
+- Order turns by `created_at, rowid`. Keep complete history in SQLite. No pagination is required for this local MVP.
+- Save the answer and successful state atomically. Completion writes must match both the turn ID and current attempt number so a stale attempt cannot overwrite a retry.
+
+### Context sent to the AI
+
+For each reply, construct context on the server from:
+
+1. The immutable snippet's code and language, with original source line numbers.
+2. The selected finding's line range, severity, category, description, and suggested fix.
+3. Up to the 10 most recent successful question/answer turns preceding the current turn, followed by the new question.
+
+The prompt scopes the assistant to this finding and its snippet, permits it to explain uncertainty or acknowledge a false positive, and treats source code/comments as data. The server loads context through the finding's relationships; clients cannot provide replacement source code, arbitrary system prompts, or another finding's history.
+
+Failed or incomplete turns are retained in the UI but excluded from model context. Older successful turns remain visible even when outside the context window; the conversation UI should state that the AI uses the most recent 10 exchanges. Keep the full source/finding context in each request and avoid relying on provider-side conversation IDs. Use the configured model and server-side key, disable automatic provider retries, and request no response storage using the existing API option. Bound replies to 1,500 output tokens; treat truncation, refusal, and empty output as explicit failures.
+
+### Execution, failure, and retry
+
+- Persist a queued turn before scheduling work, then return immediately. Reuse the application's in-process task execution pattern and share a two-call concurrency limit across review and conversation calls. This remains a single-backend-process design.
+- Apply the configured timeout to the whole reply attempt, including time waiting for a concurrency slot. The frontend polls every two seconds while a turn is active and restores state through GET after reload.
+- A lost submission response can be retried with the same `clientRequestId` to recover the persisted turn. A known failed generation uses the explicit retry endpoint.
+- Only the latest failed turn in a finding's conversation may be retried in place. Reset its answer/error and attempt timestamps, increment `attempt`, and keep its question, ID, and ordering. The retry request supplies the failed attempt number; stale/repeated retry requests return 409 rather than starting another call, and the client reloads state.
+- Users may ask a new question after a failure; failed exchanges do not enter model context. If a later question already exists, offer to copy/rephrase the old failed question as a new turn instead of retrying it out of order.
+- Shutdown cancels unfinished replies, and startup marks interrupted queued/running turns as failed with a retry message. Preserve the question and earlier answers. Provider/network errors use safe messages without exposing credentials, provider payloads, or stack traces.
+
+### Planned HTTP surface
+
+These endpoints are not implemented yet. They use the existing camelCase conventions and error envelope.
+
+| Method | Path | Request / response |
+| --- | --- | --- |
+| GET | /api/findings/:id/discussion | 200 `{ turns: DiscussionTurn[] }`; chronological history including failures and active turns |
+| POST | /api/findings/:id/discussion | `{ message, clientRequestId }` -> 202 DiscussionTurn for a new queued turn; 200 for an identical idempotent replay |
+| POST | /api/discussion-turns/:id/retry | `{ attempt }` -> 202 DiscussionTurn with incremented attempt |
+
+Use 400 for invalid input; 404 for an unknown finding/turn; 409 for an active reply, conflicting request ID, or invalid/stale retry; and 503 for missing provider configuration without creating work. Generation failures are persisted and surfaced through the discussion GET endpoint.
+
+### Acceptance criteria for implementation
+
+1. Ask two follow-up questions about a finding; the second reply can use the first exchange. Two different findings never share conversation history.
+2. Refresh while generating a reply and after completion. The question, progress/failure state, and saved answers remain recoverable. Restart recovery preserves history and permits retry.
+3. Accept/dismiss/reopen before or during discussion. Conversation history, code, and review state remain intact.
+4. Double-submit the same request ID and test a lost-response retry. Only one turn and one provider call are created. A different simultaneous question is rejected while a reply is active.
+5. Simulate timeout, refusal, incomplete/empty output, and provider failure. No failure is displayed as a successful answer; retry does not duplicate the question, and stale completion cannot overwrite the new attempt.
+6. Re-review the snippet. New findings start with no chat history; old turns stay attached to their original finding. Existing snippet/review/finding tests continue to pass.
+7. Verify context isolation, the recent-10-exchange limit, safe answer rendering, and a real short follow-up conversation. Automated provider tests use mocks; live checks are small and explicit.

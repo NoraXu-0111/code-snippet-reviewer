@@ -4,7 +4,7 @@ Tool: Codex. This is an ongoing development record, not a final claim that the a
 
 ## Example 1 — Requirements and ambiguous scope
 
-Codex extracted the assignment and distinguished explicit requirements from examples and preferences. It identified that discussion appears in the overview but is absent from the detailed interaction requirements. The developer sent a clarification to the assignment author. Discussion implementation remains pending that answer.
+Codex extracted the assignment and distinguished explicit requirements from examples and preferences. It identified that discussion appears in the overview but is absent from the detailed interaction requirements. The developer sent a clarification to the assignment author, who replied that follow-up AI conversation is preferred and either accept behavior is acceptable. The developer agreed to add per-finding AI conversation; the design and execution plan now include it as a pending implementation milestone. Acceptance continues to record resolution without applying code changes.
 
 ## Example 2 — Review versus finding state
 

@@ -1,13 +1,14 @@
 # MVP execution plan
 
-Target: 7 hours of planned work plus 1 hour buffer. This is a planning estimate, not a claim about time already spent.
+Original target: 7 hours of planned work plus 1 hour buffer, before the AI conversation scope was clarified. Discussion is now included as an additional milestone before final verification; the original estimate is not a promise that the expanded scope fits the same time budget.
 
 1. **Foundation (completed):** React/API startup, file database and migrations, shared contracts, environment example, README and AI log, initial meaningful commit.
 2. **Snippets (completed):** create/list/detail, metadata and filters, syntax highlighting and line numbers. Prove persistence across restart.
 3. **Review integration (completed):** create a review, invoke a real LLM, validate complete output, transactionally save findings and success/failure.
 4. **Review lifecycle (completed):** polling, clear loading/errors, manual retry, duplicate-trigger protection at the API boundary, interrupted-run recovery.
 5. **Finding interaction (completed):** code alongside findings, line navigation, severity/category/description/fix, persistent accept/dismiss.
-6. **Verification:** end-to-end user workflow, zero findings, malformed output, provider failure, review isolation and persistence.
-7. **Delivery:** clean setup check, architecture/tradeoffs, future work, honest AI usage examples, inspect commit history.
+6. **Per-finding AI conversation (design agreed; not implemented):** add discussion-turn persistence and request deduplication; history/send/retry endpoints; contextual OpenAI replies; expandable Discuss UI with pending/failure states and saved history. Keep finding resolution independent. Follow the [conversation design](data-contract.md#per-finding-ai-conversation--planned) for context boundaries, retry semantics, and acceptance criteria.
+7. **Verification:** end-to-end snippet/review/finding/discussion workflow, zero findings, malformed output, provider failure, isolation, retry, and persistence. Reproduce setup and build in a clean checkout.
+8. **Delivery:** clean setup instructions, final architecture/tradeoffs, future work, honest AI usage examples, inspect commit history.
 
-Keep commits tied to completed increments. Record AI examples while developing. Discussion awaits the assignment author's clarification. Authentication, snippet editing/deletion, automatic fixes, PR import, streaming, and review-history navigation are outside the initial scope.
+Keep commits tied to completed increments. Record AI examples while developing. The assignment author prefers follow-up conversation with the AI and accepts recording finding acceptance without applying a fix; these choices are now part of the design. Authentication, snippet editing/deletion, automatic fixes, PR import, streaming, rich chat rendering, and review-history navigation remain outside the MVP.

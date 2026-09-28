@@ -2,7 +2,7 @@
 
 A local React application for submitting code snippets to an LLM and resolving individual review findings.
 
-**Current milestone: step 5, finding interaction.** The core workflow is implemented: create and browse snippets, trigger an OpenAI review, inspect findings beside highlighted code, locate their source lines, and accept/dismiss or reopen them. Review and resolution state persist across reloads. Discussion remains pending clarification; final delivery verification is next.
+**Current milestone: step 5, finding interaction.** The core workflow is implemented: create and browse snippets, trigger an OpenAI review, inspect findings beside highlighted code, locate their source lines, and accept/dismiss or reopen them. Review and resolution state persist across reloads. Per-finding AI conversation is now agreed scope and designed, but not implemented; it is the next milestone before final verification.
 
 ## Run locally
 
@@ -60,7 +60,7 @@ See [data and API contracts](docs/data-contract.md) for invariants and planned e
 - Accept/dismiss records a finding's resolution and does not modify code.
 - Each rerun creates a new review and findings. The latest review drives the dashboard; old resolutions are not copied.
 - Background reviews run as asynchronous tasks in a single local backend process, with persisted status and frontend polling. Startup marks interrupted queued/running reviews as failed; retry creates a new run. Run only one backend process against a database: multiple workers require ownership leases and a durable task runner.
-- Discussion is pending clarification: the overview mentions it, but the detailed requirements do not define comments versus AI conversation.
+- The assignment author clarified that discussion should ideally be follow-up conversation with the AI. This is included in the MVP design: per-finding chat, persistent history, snippet/finding context, and failure/retry handling. The author also accepts recording acceptance without automatically applying fixes, matching this project's behavior. See the [planned conversation design](docs/data-contract.md#per-finding-ai-conversation--planned).
 - OpenAI credentials are server-only and excluded from settings serialization. Provider exception bodies are not stored in findings, returned to clients, or logged by the runner.
 
 ## Snippet management
