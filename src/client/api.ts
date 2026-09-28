@@ -33,6 +33,7 @@ export async function request<T>(
   return body as T;
 }
 export type ReviewRun = components["schemas"]["ReviewRun"];
+export type ReviewHistory = components["schemas"]["ReviewHistory"];
 export type ReviewDetail = components["schemas"]["ReviewDetail"];
 export type Finding = components["schemas"]["Finding"];
 export function useResource<T>(

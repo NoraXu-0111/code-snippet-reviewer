@@ -2,7 +2,7 @@
 
 A local React application for submitting code snippets to an LLM and resolving individual review findings.
 
-Create and browse snippets, request an OpenAI review, inspect findings beside highlighted code, accept/dismiss or reopen them, and discuss each finding with the AI. Review state, resolutions, and conversations persist across reloads. The MVP has passed clean-clone setup, build, tests, and production-startup verification; see the [verification record and demo guide](docs/verification.md).
+Create and browse snippets, request an OpenAI review, inspect findings beside highlighted code, accept/dismiss or reopen them, and discuss each finding with the AI. Review state, resolutions, and conversations persist across reloads. The original MVP passed clean-clone setup and production-startup verification. It now also includes review history, a wide discussion workspace, sample code, browser regression tests, local model-call tracing, and a reproducible review-quality evaluation; see the [verification record](docs/verification.md) and [quality guide](docs/quality.md).
 
 ## Run locally
 
@@ -33,10 +33,15 @@ Then open http://127.0.0.1:3001. The Python API serves the built React applicati
 | `npm run db:migrate` | Initialize or migrate the file database explicitly |
 | `npm run api:types` | Regenerate frontend types from the Python API schema |
 | `npm run typecheck` | Check frontend TypeScript |
-| `npm test` | Database, API lifecycle, and mocked provider tests |
+| `npm test` | Database, API lifecycle, mocked provider, tracing, and evaluation-grader tests |
+| `npm run test:e2e` | Build and run isolated desktop/narrow-screen browser workflows |
+| `npm run eval:review -- --live` | Opt-in billable review-quality evaluation on synthetic cases |
+| `npm run trace:calls` | Inspect recent local model-call metadata |
 | `npm run build` | Typecheck and build frontend |
 | `npm start` | Serve the built application and API |
 | `npm run check` | Run typecheck, tests, and build |
+
+For browser tests, install the test browser once with `npx playwright install chromium`, then run `npm run test:e2e`. These tests use a temporary SQLite database and deterministic providers on port 3032; no OpenAI key or API calls are used.
 
 ## Architecture
 
@@ -78,11 +83,11 @@ See [data and API contracts](docs/data-contract.md) for invariants and implement
 2. The API persists a queued run and immediately returns 202. Reviews and discussion replies share two concurrent provider slots, with one active review per snippet and one active reply per finding. The total time limit includes queue wait. SDK automatic retries are disabled; users explicitly retry failures.
 3. The backend uses the [Responses API with structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), validates the schema and source line bounds, and saves all findings plus successful completion in one SQLite transaction. `store=False` disables response storage through this API option; it is not a claim of zero provider retention.
 4. Refusal, incomplete output, invalid findings, timeout, authentication, quota, and provider errors are failures, not successful empty reviews. A completed empty findings array is a valid result.
-5. Active detail/list views poll every two seconds. Reloading restores persisted state. Graceful shutdown cancels unfinished tasks; abrupt process interruption is recovered on next startup. Terminal runs and their findings remain available through the API, although there is no history selector yet.
+5. Active detail/list views poll every two seconds. Reloading restores persisted state. Graceful shutdown cancels unfinished tasks; abrupt process interruption is recovered on next startup. The **Review history** selector restores earlier runs, resolutions, and discussions. The selected run is encoded in the URL and survives reload; dashboard status still reflects the latest run.
 
 Default model: [`gpt-4.1-mini`](https://developers.openai.com/api/docs/models/gpt-4.1-mini), configurable through `.env`. Responses and severity judgments remain model-generated suggestions; broader quality evaluation and severity calibration are future work.
 
-Validation: 56 automated tests (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
+Validation: 63 automated backend/grader tests and 10 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
 
 ## Finding interaction
 
@@ -94,17 +99,25 @@ Validation: 56 automated tests (mocked provider, no API cost), frontend typechec
 
 ## Finding discussion
 
-- Choose **Discuss with AI** on any finding, including accepted or dismissed ones. Ask a question or follow up on a previous answer. The UI shows queued/running progress, disables that composer while generating, and polls every two seconds. Other finding actions remain available.
+- Choose **Discuss with AI** on any finding, including accepted or dismissed ones. A wide discussion workspace opens below the code and findings; closing it restores keyboard focus and retains the draft in session storage when available. Ask a question or follow up on a previous answer. The UI shows queued/running progress, disables that composer while generating, and polls every two seconds. Other finding actions remain available.
 - Each request includes the full numbered snippet, the selected finding, and up to 10 recent successful exchanges from that finding only. All exchanges remain saved locally. The implementation follows OpenAI's [manual conversation history](https://developers.openai.com/api/docs/guides/conversation-state) approach; it uses plain text, no streaming, `store=False`, and a 1,500-token reply limit.
 - **Retry reply** retries the latest failed turn in place. Earlier failed questions can be copied into the composer with **Use question again**. Failures stay visible but are excluded from AI context. Retries preserve question IDs and increment an attempt number; stale completions cannot overwrite a newer attempt.
 - A client request ID prevents duplicate submissions. An uncertain submission keeps its exact question and ID in session storage (or memory if storage is unavailable). After a lost response or reload, **Check submission** recovers the persisted turn without making another AI call. Explicit provider retries are separate from submission recovery.
-- Resolution changes do not affect conversation history, and replies cannot change source code or finding status. A new review creates new findings with empty conversations; older conversations remain available through the API.
+- Resolution changes do not affect conversation history, and replies cannot change source code or finding status. A new review creates new findings with empty conversations; older conversations remain accessible through the review-history selector and API.
 - Shutdown/startup recovery marks interrupted replies failed without losing saved questions. The same configured timeout bounds both queue wait and generation. Only one backend process may own a database.
 - Browser verification used two short real follow-ups on the averaging example. An isolated fake-provider server verified a lost POST response plus reload/recovery, failed-reply retry without duplicate questions, finding isolation, and HTML displayed as literal text. No real API calls are made by automated tests.
 
+## Examples, evaluation, and diagnostics
+
+The new-snippet form offers Python and TypeScript sample code. Examples fill only an empty form, never overwrite a draft, and make no automatic API call. Save the snippet, then explicitly request its review.
+
+The default `review-v2` prompt was selected after comparing three versions against a fixed ten-case development dataset. Severity agreement improved, but speculative findings on correct SQL remain a known limitation. Raw synthetic reports and prompt snapshots are committed under `evals/`; metric definitions, results, limitations, manual grading, and run commands are in [quality.md](docs/quality.md). These scores are regression indicators, not general accuracy claims.
+
+Local model-call spans record model/prompt version, job ID/attempt, timing, available token usage, provider IDs and failure class. They do not duplicate source, messages, replies, exception bodies, or API keys. View them with `npm run trace:calls`; calls made before this feature are not backfilled. See [tracing details](docs/quality.md#local-model-call-tracing).
+
 ## What I would change with more time
 
-For deployment beyond a single local process, introduce a durable job worker with leases/recovery, address authentication and data ownership, and review database concurrency needs. Add snippet revisions before allowing edits, expose review history, and evaluate review quality against representative snippets. Prioritize these only when their use cases justify the added complexity.
+For deployment beyond a single local process, introduce a durable job worker with leases/recovery, address authentication and data ownership, and review database concurrency needs. Add snippet revisions before allowing edits and extend quality evaluation to independently labeled, representative held-out snippets. Prioritize these only when their use cases justify the added complexity.
 
 ## AI usage log
 

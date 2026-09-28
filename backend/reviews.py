@@ -10,6 +10,7 @@ from .contracts import Finding, ReviewDetail, ReviewRun, ReviewStatus, parse_rev
 from .database import open_database
 from .reviewer import Reviewer, ReviewFailure
 from .snippets import get_snippet
+from .tracing import trace_subject
 
 
 def now() -> str:
@@ -86,7 +87,8 @@ class ReviewService:
                         ).rowcount
                     if not changed:
                         return
-                    output = await self.reviewer.review(snippet)
+                    with trace_subject(run.id):
+                        output = await self.reviewer.review(snippet)
                     output = parse_review_output(output.model_dump(), snippet.code)
                     with closing(open_database(self.path, migrate=False)) as db:
                         db.execute("BEGIN IMMEDIATE")

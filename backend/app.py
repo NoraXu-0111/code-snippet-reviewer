@@ -11,8 +11,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import PROJECT_ROOT, Settings, get_settings
 from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
-from .contracts import CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, RetryDiscussionTurn
+from .contracts import CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, RetryDiscussionTurn, ReviewHistory
 from .database import open_database
+from .tracing import recover_traces
 from . import findings, snippets
 from .reviewer import OpenAIReviewer, Reviewer
 from .reviews import ActiveReviewError, ReviewService, get_review
@@ -32,6 +33,7 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
         discussions = DiscussionService(settings.database_path, discussion_provider or OpenAIDiscussionProvider(settings),
                                         settings.review_timeout_seconds, slots,
                                         configured=discussion_provider is not None or bool(settings.openai_api_key))
+        recover_traces(settings.database_path)
         service.recover_interrupted()
         discussions.recover_interrupted()
         app.state.reviews = service
@@ -96,6 +98,15 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
         if result is None:
             raise HTTPException(status_code=404, detail="Snippet not found")
         return result
+
+    @app.get("/api/snippets/{snippet_id}/reviews", response_model=ReviewHistory,
+             responses={404: {"model": ErrorResponse}})
+    def review_history(snippet_id: UUID) -> ReviewHistory:
+        with closing(open_database(settings.database_path, migrate=False)) as db:
+            if db.execute("SELECT 1 FROM snippets WHERE id = ?", (str(snippet_id),)).fetchone() is None:
+                raise HTTPException(404, "Snippet not found")
+            rows = db.execute("SELECT * FROM review_runs WHERE snippet_id = ? ORDER BY created_at DESC, rowid DESC", (str(snippet_id),))
+            return ReviewHistory(reviews=[ReviewRun.model_validate(dict(row)) for row in rows])
 
     @app.post("/api/snippets/{snippet_id}/reviews", response_model=ReviewRun, status_code=202,
               responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})

@@ -783,3 +783,92 @@ button.finding-lines[aria-pressed="true"] {
   padding: 10px;
   border-radius: 7px;
 }
+
+/* Wide, in-page discussion keeps source and finding navigation visible above. */
+.detail-grid {
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+}
+.history-toolbar,
+.example-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.history-toolbar label,
+.example-picker label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.history-toolbar select,
+.example-picker select {
+  max-width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid #d5ded7;
+  border-radius: 7px;
+  background: white;
+}
+.history-notice {
+  font-size: 12px;
+  color: #786025;
+}
+.example-picker p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.discussion-workspace {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.65fr) minmax(0, 1.35fr);
+  gap: 32px;
+  margin-top: 24px;
+  padding: 28px;
+  scroll-margin-top: 20px;
+}
+.discussion-workspace[hidden] {
+  display: none;
+}
+.discussion-context {
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.discussion-context h2 {
+  font-size: 21px;
+}
+.discussion-workspace .discussion {
+  margin: 0;
+  border-top: 0;
+  padding: 0;
+  font-size: 14px;
+  min-width: 0;
+}
+.discussion-workspace .discussion-history {
+  max-height: 55vh;
+}
+.discussion-workspace .chat-message {
+  padding: 14px 16px;
+}
+.discussion-workspace .chat-user {
+  margin-left: 32px;
+}
+.discussion-workspace textarea {
+  min-height: 100px;
+}
+@media (max-width: 850px) {
+  .detail-grid,
+  .discussion-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .discussion-workspace {
+    gap: 16px;
+    padding: 20px;
+  }
+  .history-toolbar select {
+    width: 100%;
+  }
+  .discussion-workspace .chat-user {
+    margin-left: 12px;
+  }
+}

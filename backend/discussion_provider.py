@@ -4,6 +4,7 @@ from typing import Protocol
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, AuthenticationError, RateLimitError
 
 from .config import Settings
+from .tracing import record_response, traced
 from .contracts import DiscussionTurn, Finding, Snippet
 
 
@@ -31,9 +32,11 @@ at most the 10 most recent successful exchanges, not necessarily the full histor
 
 
 class OpenAIDiscussionProvider:
+    prompt_version = "discussion-v1"
     def __init__(self, settings: Settings):
         self.settings = settings
 
+    @traced("discussion")
     async def reply(self, snippet: Snippet, finding: Finding, history: list[DiscussionTurn], question: str) -> str:
         if not self.settings.openai_api_key:
             raise DiscussionFailure("OpenAI API key is missing. Set OPENAI_API_KEY and restart the server.")
@@ -58,6 +61,7 @@ class OpenAIDiscussionProvider:
                 response = await client.responses.create(
                     model=self.settings.openai_model, input=messages, max_output_tokens=1500, store=False,
                 )
+            record_response(response)
             if response.status != "completed":
                 raise DiscussionFailure("OpenAI returned an incomplete reply. Please retry or ask a narrower question.")
             if any(item.type == "message" and any(part.type == "refusal" for part in item.content) for item in response.output):

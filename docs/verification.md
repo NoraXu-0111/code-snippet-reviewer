@@ -2,7 +2,7 @@
 
 ## Verification record
 
-Verified on September 28, 2026 against implementation commit `6aa8794`. The following delivery commit changes documentation only.
+Verified on September 28, 2026 against implementation commit `6aa8794`. This section records the original clean-clone verification; the later improvement milestone is recorded below.
 
 A fresh local Git clone was created outside the working repository. It did not contain the development `.env`, database, `node_modules`, `.venv`, or build output. Installations used the committed lockfiles; normal machine-level package caches were available. No OpenAI credentials were supplied to this clone.
 
@@ -35,7 +35,7 @@ The test suite emits one non-blocking upstream Starlette/httpx deprecation warni
 | Discussion payload, provider errors, refusal/incomplete/empty reply handling | `tests/test_openai_discussion.py`; earlier real two-turn conversation |
 | Lost-response recovery after reload; retry without duplicate question; safe literal rendering | Earlier browser checks against an isolated fake-provider server |
 
-Browser checks are manual checks performed through browser automation, not a committed Playwright test suite. Model correctness and severity calibration have only received a small smoke test, not a quality evaluation. Concurrency verification targets the documented single-process local architecture.
+At this original milestone, browser checks were manual automation and model quality had only received a smoke test. The improvement milestone below supersedes those two limitations with a committed browser suite and small development-set evaluation. Concurrency verification targets the documented single-process local architecture.
 
 ## Short demo
 
@@ -57,4 +57,15 @@ Before presenting, set `OPENAI_API_KEY` in `.env`, restart the backend, and run 
 
 The committed repository contains source, migrations, dependency lockfiles, tests, setup instructions, architecture/design decisions, and five concrete AI-usage examples. Local secrets, databases, temporary fixtures, dependency directories, and build output are excluded. Share the Git repository or a Git-preserving archive when submitting so reviewers can inspect the incremental history.
 
-The MVP deliberately omits authentication, snippet edits/deletes, automatic fix application, streaming, rich Markdown chat, review-history navigation, and a durable multi-process worker. Deployment or submission to an external destination has not been performed.
+The MVP deliberately omits authentication, snippet edits/deletes, automatic fix application, streaming, rich Markdown chat, and a durable multi-process worker. Deployment or submission to an external destination has not been performed.
+
+## Improvement milestone verification
+
+- TypeScript includes browser test/config files; production build and 63 backend/grader tests pass.
+- Five browser workflows run at 1280×900 and 390×844 (ten cases): review/resolution/discussion/rerun/history, generation failures/retries/draft retention, lost-response recovery across reload, zero findings/filtering, and sample-code/focus/width behavior. Eight passed on the first run; the two filter tests passed after correcting their locator. No app workaround or API call was used for that correction.
+- Browser tests use the real FastAPI routes and a temporary SQLite file with deterministic provider adapters. `reuseExistingServer: false` avoids accidentally attaching to a development instance. The temporary server/database are cleaned up afterward.
+- Tracing tests verify metadata-only writes, concurrent subject isolation, failures/cancellation/interruption, best-effort storage, and correlation through the real OpenAI adapters with mocked SDK responses.
+- Ten synthetic evaluation cases were run 50 times in total across three prompt versions: v1 once, v2 twice, v3 twice. See [quality.md](quality.md) for the measurements, source reports, chosen version and known SQL false positive.
+- The existing development snippet and its saved conversation were visually checked in the new wide workspace without rerunning the model. Historical results retain their original severity; prompt changes apply only to new reviews.
+
+Install browser support with `npx playwright install chromium`; run `npm run check` and `npm run test:e2e` for software validation. Run `npm run eval:review -- --live` separately for billable model-quality evaluation. Browser trace artifacts may include synthetic test content; they are ignored by Git.

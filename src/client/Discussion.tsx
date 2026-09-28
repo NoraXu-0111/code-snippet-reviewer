@@ -29,7 +29,26 @@ export function Discussion({ findingId }: { findingId: string }) {
   const [pending, setPending] = useState<Submission | null>(() =>
     readPending(storageKey),
   );
-  const [message, setMessage] = useState(pending?.message ?? "");
+  const [message, setMessage] = useState(() => {
+    try {
+      return (
+        pending?.message ??
+        sessionStorage.getItem(`discussion-draft:${findingId}`) ??
+        ""
+      );
+    } catch {
+      return pending?.message ?? "";
+    }
+  });
+  useEffect(() => {
+    try {
+      if (message)
+        sessionStorage.setItem(`discussion-draft:${findingId}`, message);
+      else sessionStorage.removeItem(`discussion-draft:${findingId}`);
+    } catch {
+      /* Draft persistence is best effort when storage is unavailable. */
+    }
+  }, [findingId, message]);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const inFlight = useRef(false);

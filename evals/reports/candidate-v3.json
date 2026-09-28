@@ -1,0 +1,654 @@
+{
+  "datasetSha256": "f90916ffacceb1e2cb0dca6d90e811608bd8fa3a79d64e9a6ba44c594accdce3",
+  "promptSha256": "0b12b23d6dffd7be7216edc3a65d522c34094cb0562113dd1dfa786d3129b755",
+  "promptVersion": "review-v3",
+  "model": "gpt-4.1-mini",
+  "gitRevision": "c117e92a1f9c806aa3801eef554c2692d46b976d",
+  "startedAt": "2026-09-28T22:44:04.363948+00:00",
+  "repeats": 2,
+  "grading": "Line/category/keyword candidate matching. Manually inspect correctness, duplicates and fixes; this is not measured real-world accuracy.",
+  "rows": [
+    {
+      "caseId": "empty-average",
+      "repeat": 1,
+      "subjectId": "eval:empty-average:1:d263767d-8ff9-4e65-b4b3-1ca7016b78ca",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 1,
+            "endLine": 2,
+            "severity": "warning",
+            "category": "bug",
+            "description": "The function does not handle the case when the input list 'values' is empty, which will cause a ZeroDivisionError when computing the average.",
+            "suggestedFix": "Add a check to return None or raise a meaningful exception if the list is empty before performing division."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "empty-input",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1846,
+      "usage": {
+        "input_tokens": 696,
+        "output_tokens": 81
+      }
+    },
+    {
+      "caseId": "empty-average",
+      "repeat": 2,
+      "subjectId": "eval:empty-average:2:e8bf77cf-c937-4e6f-a210-133a3b2fb48a",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 2,
+            "severity": "warning",
+            "category": "bug",
+            "description": "The function does not handle the case when the input list 'values' is empty, which will cause a ZeroDivisionError when computing the average.",
+            "suggestedFix": "Add a check to return a default value or raise a meaningful exception if 'values' is empty."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "empty-input",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1329,
+      "usage": {
+        "input_tokens": 696,
+        "output_tokens": 81
+      }
+    },
+    {
+      "caseId": "mutable-default",
+      "repeat": 1,
+      "subjectId": "eval:mutable-default:1:c3f47ac9-da0b-4b56-b9d0-fbe1a51bb275",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 1,
+            "endLine": 3,
+            "severity": "warning",
+            "category": "bug",
+            "description": "Using a mutable default argument (items=[]) in a function definition can lead to unexpected behavior because the same list is shared across all calls to the function without an explicit argument. This can cause the list to accumulate items over multiple calls unintentionally.",
+            "suggestedFix": "Use None as the default value and initialize the list inside the function, e.g., def collect(item, items=None): if items is None: items = []"
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "shared-default",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1267,
+      "usage": {
+        "input_tokens": 709,
+        "output_tokens": 113
+      }
+    },
+    {
+      "caseId": "mutable-default",
+      "repeat": 2,
+      "subjectId": "eval:mutable-default:2:7892da88-faa2-4301-981f-0a7e70078776",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 1,
+            "endLine": 3,
+            "severity": "warning",
+            "category": "bug",
+            "description": "The function 'collect' uses a mutable default argument 'items=[]', which can lead to unexpected behavior because the same list is used across multiple function calls, accumulating items from previous calls.",
+            "suggestedFix": "Change the default value to None and initialize inside the function, e.g., def collect(item, items=None): if items is None: items = []"
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "shared-default",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1410,
+      "usage": {
+        "input_tokens": 709,
+        "output_tokens": 99
+      }
+    },
+    {
+      "caseId": "sql-injection",
+      "repeat": 1,
+      "subjectId": "eval:sql-injection:1:c6ef5ecf-bd8b-4f34-9281-210ed647f8b3",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 2,
+            "severity": "critical",
+            "category": "security",
+            "description": "The code constructs an SQL query by concatenating user input directly into the query string, which makes it vulnerable to SQL injection attacks. This could allow an attacker to execute arbitrary SQL commands, compromising the database.",
+            "suggestedFix": "Use parameterized queries or prepared statements to safely include user input, e.g. use placeholders and pass parameters separately."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "sql-injection",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1409,
+      "usage": {
+        "input_tokens": 713,
+        "output_tokens": 96
+      }
+    },
+    {
+      "caseId": "sql-injection",
+      "repeat": 2,
+      "subjectId": "eval:sql-injection:2:d2586e19-853e-4747-9b38-f7dd861d3d27",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 2,
+            "severity": "critical",
+            "category": "security",
+            "description": "The code constructs an SQL query by concatenating the username directly into the query string, making it vulnerable to SQL injection attacks. This can allow attackers to execute arbitrary SQL commands and compromise the database.",
+            "suggestedFix": "Use parameterized queries or prepared statements to safely include user input in SQL queries, e.g., connection.execute(\"SELECT * FROM users WHERE name = ?\", (username,)).fetchall()"
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "sql-injection",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1307,
+      "usage": {
+        "input_tokens": 713,
+        "output_tokens": 109
+      }
+    },
+    {
+      "caseId": "off-by-one",
+      "repeat": 1,
+      "subjectId": "eval:off-by-one:1:e311745b-d824-4e07-8f10-02dad8a4691f",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 3,
+            "endLine": 4,
+            "severity": "warning",
+            "category": "bug",
+            "description": "The loop iterates with 'i <= values.length', causing an off-by-one error that accesses 'values[values.length]', which is undefined. This will result in adding 'undefined' to sum, leading to NaN if any addition occurs after that point.",
+            "suggestedFix": "Change the loop condition to 'i < values.length' to iterate only over valid indices."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "out-of-bounds",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1528,
+      "usage": {
+        "input_tokens": 780,
+        "output_tokens": 102
+      }
+    },
+    {
+      "caseId": "off-by-one",
+      "repeat": 2,
+      "subjectId": "eval:off-by-one:2:ed6d6576-0c7e-4a52-8f7a-840fe12bf7d5",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 3,
+            "endLine": 4,
+            "severity": "warning",
+            "category": "bug",
+            "description": "The for loop uses 'i <= values.length', causing an out-of-bounds access on the last iteration when i equals values.length. This leads to 'values[i]' being undefined, and adding undefined to sum results in NaN.",
+            "suggestedFix": "Change the loop condition to 'i < values.length' to iterate only over valid indices of the array."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "out-of-bounds",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1295,
+      "usage": {
+        "input_tokens": 780,
+        "output_tokens": 100
+      }
+    },
+    {
+      "caseId": "async-for-each",
+      "repeat": 1,
+      "subjectId": "eval:async-for-each:1:74fec250-b33c-4f2b-ab19-5866d02de40a",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 4,
+            "severity": "warning",
+            "category": "bug",
+            "description": "Using `forEach` with an async callback leads to unhandled promises because `forEach` does not wait for async functions to complete. This means `saveAll` may exit before all `save` operations finish, causing incomplete data saving.",
+            "suggestedFix": "Use a for...of loop with await, or collect promises with `map` and use `Promise.all` to ensure all saves complete before function resolves."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "unawaited-work",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1426,
+      "usage": {
+        "input_tokens": 754,
+        "output_tokens": 112
+      }
+    },
+    {
+      "caseId": "async-for-each",
+      "repeat": 2,
+      "subjectId": "eval:async-for-each:2:6ea8f25f-81d0-4c71-b7ab-70b4e4d0154e",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 4,
+            "severity": "warning",
+            "category": "bug",
+            "description": "Using async function inside Array.forEach does not properly handle the asynchronous nature of the save operations. The parent async function saveAll will not await the completion of all save calls, potentially leading to unhandled rejections or incomplete processing.",
+            "suggestedFix": "Use a for...of loop with await, or use Promise.all with Array.map to properly await all save operations."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "unawaited-work",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1450,
+      "usage": {
+        "input_tokens": 754,
+        "output_tokens": 101
+      }
+    },
+    {
+      "caseId": "first-item-empty",
+      "repeat": 1,
+      "subjectId": "eval:first-item-empty:1:baadad9b-4f17-46c7-a3c4-155075dc6f48",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 2,
+            "severity": "warning",
+            "category": "bug",
+            "description": "The function 'first' accesses the first element of 'values' without checking if 'values' is empty. This can raise an IndexError when called with an empty list or iterable.",
+            "suggestedFix": "Add a check to ensure 'values' is not empty before returning the first element, or handle the exception appropriately."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "empty-index",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1245,
+      "usage": {
+        "input_tokens": 693,
+        "output_tokens": 92
+      }
+    },
+    {
+      "caseId": "first-item-empty",
+      "repeat": 2,
+      "subjectId": "eval:first-item-empty:2:69eaef28-fb11-444b-8164-cd9ad3cb8a9c",
+      "expectedCount": 1,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 2,
+            "severity": "warning",
+            "category": "bug",
+            "description": "The function 'first' assumes that 'values' is a non-empty sequence. If an empty sequence is passed, this will raise an IndexError.",
+            "suggestedFix": "Add a check to ensure 'values' is not empty before accessing the first element, or handle the exception appropriately."
+          }
+        ]
+      },
+      "grade": {
+        "matched": [
+          {
+            "issue": "empty-index",
+            "findingIndex": 0,
+            "severityMatch": true
+          }
+        ],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": null
+      },
+      "latencyMs": 1601,
+      "usage": {
+        "input_tokens": 693,
+        "output_tokens": 85
+      }
+    },
+    {
+      "caseId": "safe-average",
+      "repeat": 1,
+      "subjectId": "eval:safe-average:1:8f83c7d3-ad4c-4c38-9cef-08ae877ba0f6",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": []
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": true
+      },
+      "latencyMs": 1074,
+      "usage": {
+        "input_tokens": 731,
+        "output_tokens": 7
+      }
+    },
+    {
+      "caseId": "safe-average",
+      "repeat": 2,
+      "subjectId": "eval:safe-average:2:743e7402-d836-42cb-ad16-f4add175ce84",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": []
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": true
+      },
+      "latencyMs": 718,
+      "usage": {
+        "input_tokens": 731,
+        "output_tokens": 6
+      }
+    },
+    {
+      "caseId": "safe-sql",
+      "repeat": 1,
+      "subjectId": "eval:safe-sql:1:4e1ec6a8-db4b-437e-ba42-f6a01a80fba6",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 2,
+            "severity": "info",
+            "category": "style",
+            "description": "Using 'fetchall()' may return all matching rows, which could be inefficient or unnecessary if only one user is expected. Consider using 'fetchone()' if a single user record is sufficient.",
+            "suggestedFix": "Use 'fetchone()' instead of 'fetchall()' if expecting a single user, e.g., return connection.execute(\"SELECT * FROM users WHERE name = ?\", (username,)).fetchone()"
+          }
+        ]
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [
+          0
+        ],
+        "negativePass": false
+      },
+      "latencyMs": 1459,
+      "usage": {
+        "input_tokens": 711,
+        "output_tokens": 114
+      }
+    },
+    {
+      "caseId": "safe-sql",
+      "repeat": 2,
+      "subjectId": "eval:safe-sql:2:ddce86d8-afa0-4764-b78e-01504d0af22f",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": [
+          {
+            "startLine": 2,
+            "endLine": 2,
+            "severity": "info",
+            "category": "style",
+            "description": "The SQL query uses SELECT * which can fetch unnecessary columns. It's generally better to specify the necessary columns explicitly for clarity and potential performance benefits.",
+            "suggestedFix": "Specify the needed columns explicitly, e.g., SELECT id, name, email FROM users WHERE name = ?"
+          }
+        ]
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [
+          0
+        ],
+        "negativePass": false
+      },
+      "latencyMs": 1242,
+      "usage": {
+        "input_tokens": 711,
+        "output_tokens": 81
+      }
+    },
+    {
+      "caseId": "safe-map",
+      "repeat": 1,
+      "subjectId": "eval:safe-map:1:99a1c55a-7186-4ddf-a82a-48b7b0f0aa8b",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": []
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": true
+      },
+      "latencyMs": 734,
+      "usage": {
+        "input_tokens": 711,
+        "output_tokens": 6
+      }
+    },
+    {
+      "caseId": "safe-map",
+      "repeat": 2,
+      "subjectId": "eval:safe-map:2:9db3fa0b-a1bd-4930-9c19-7f40f73a97ec",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": []
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": true
+      },
+      "latencyMs": 678,
+      "usage": {
+        "input_tokens": 711,
+        "output_tokens": 6
+      }
+    },
+    {
+      "caseId": "comment-injection",
+      "repeat": 1,
+      "subjectId": "eval:comment-injection:1:17804ead-cb91-41d7-9d53-ef82b8135455",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": []
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": true
+      },
+      "latencyMs": 756,
+      "usage": {
+        "input_tokens": 716,
+        "output_tokens": 6
+      }
+    },
+    {
+      "caseId": "comment-injection",
+      "repeat": 2,
+      "subjectId": "eval:comment-injection:2:00a0ddee-2058-4f65-b49f-a3beb2eee15f",
+      "expectedCount": 0,
+      "status": "succeeded",
+      "output": {
+        "findings": []
+      },
+      "grade": {
+        "matched": [],
+        "missed": [],
+        "unmatchedFindings": [],
+        "negativePass": true
+      },
+      "latencyMs": 615,
+      "usage": {
+        "input_tokens": 716,
+        "output_tokens": 6
+      }
+    }
+  ],
+  "summary": {
+    "attempts": 20,
+    "succeeded": 20,
+    "failed": 0,
+    "expectedIssues": 12,
+    "returnedFindings": 14,
+    "heuristicMatches": 12,
+    "candidatePrecision": 0.8571428571428571,
+    "candidateRecall": 1.0,
+    "matchedSeverityAgreement": 1.0,
+    "negativeCasesPassed": 6,
+    "negativeCaseAttempts": 8,
+    "medianLatencyMs": 1301,
+    "inputTokens": 14428,
+    "outputTokens": 1403,
+    "usageAvailableAttempts": 20
+  },
+  "gitDirty": true,
+  "openaiSdkVersion": "2.54.0",
+  "provenanceNote": "Run from implementation work based on gitRevision, before committing the additions. Exact prompt snapshots and dataset hashes are preserved."
+}

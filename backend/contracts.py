@@ -201,6 +201,10 @@ class SnippetDetail(Contract):
     latest_review: ReviewRun | None
 
 
+class ReviewHistory(Contract):
+    reviews: list[ReviewRun]
+
+
 class ReviewDetail(Contract):
     review: ReviewRun
     findings: list[Finding]

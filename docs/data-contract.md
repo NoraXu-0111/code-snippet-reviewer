@@ -57,6 +57,7 @@ All endpoints below are implemented.
 | POST | /api/snippets | `{ title, language, code }` -> 201 Snippet |
 | GET | /api/snippets | Optional `language`, `reviewStatus`; -> `{ snippets: [...], languages: [...] }`; latest review status per row; languages across the workspace |
 | GET | /api/snippets/:id | -> `{ snippet, latestReview: ReviewRun \| null }` |
+| GET | /api/snippets/:id/reviews | -> `{ reviews: ReviewRun[] }`, newest first by `created_at DESC, rowid DESC`; unknown snippet -> 404 |
 | POST | /api/snippets/:id/reviews | -> 202 ReviewRun; 409 if an active review exists |
 | GET | /api/reviews/:id | -> `{ review, findings }`; polling source |
 | PATCH | /api/findings/:id | `{ resolution }` -> updated Finding |
@@ -67,12 +68,12 @@ Error envelope: `{ error: { code, message } }`. Validation failures use 400, unk
 
 ### User experience and boundaries
 
-- Each finding has a **Discuss** button that expands its conversation inside the finding card. Users can ask for an explanation, an example, a possible false positive, or a revised fix.
+- Each finding has a **Discuss** button that opens its conversation in a wide workspace below the code/finding panels. Closing it returns focus to the finding; unsent drafts are retained in browser session storage when available. Users can ask for an explanation, an example, a possible false positive, or a revised fix.
 - Show the user's question and the AI's answer in chronological order. Display pending, failed, and retry states alongside the relevant question. Conversation history survives page reloads and application restarts.
 - The composer is disabled while that finding has an active reply. Other findings remain usable, and users can collapse the conversation or navigate away while a reply is being generated.
 - Accept, dismiss, and reopen remain available independently of discussion. Users may discuss resolved findings. Sending a message does not change resolution, and changing resolution does not clear history.
 - AI responses are explanations and suggestions only. They cannot edit source code, change the original finding, change review status, or accept/dismiss on the user's behalf. Display answer text with preserved whitespace; rich Markdown and streaming are outside this milestone.
-- Re-review creates new findings with empty conversations. Old conversations remain attached to their original finding and review. No conversation is copied or matched across runs; a historical-review browser remains out of scope.
+- Re-review creates new findings with empty conversations. Old conversations remain attached to their original finding and review. No conversation is copied or matched across runs; the Review history selector can reopen the original review and conversation. Selection persists as the `review` query parameter; a review outside the snippet’s history is rejected by the UI.
 
 ### Data ownership and persistence
 
@@ -154,3 +155,7 @@ Use 400 for invalid input; 404 for an unknown finding/turn; 409 for an active re
 ### Verification record
 
 The 56-test suite includes mocked discussion/provider checks for follow-up history, finding isolation, the recent-10 context window, idempotent replay, conflicts, invalid input, missing configuration, provider failures, empty replies, refusal/truncation, queue timeout, guarded retries, restart recovery, and unchanged snippet/resolution behavior. Typecheck and production build pass. Browser checks cover a real two-turn conversation on the synthetic average snippet, persisted history, resolution independence, lost-response recovery across reload, failed-reply retry, separate finding history, and literal HTML-safe rendering. The failure checks use an isolated fake provider; only the two short successful follow-ups call OpenAI.
+
+## Model-call diagnostics
+
+`003_model_calls.sql` adds local call spans, keyed by operation, subject ID and attempt. They intentionally do not contain code, prompt bodies, user messages, assistant text or exception bodies. Model-call spans are diagnostic records rather than review/finding state; timing excludes queue wait. See [quality.md](quality.md#local-model-call-tracing) for fields, failure behavior, commands and limitations.

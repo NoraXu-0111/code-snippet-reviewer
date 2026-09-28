@@ -63,7 +63,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /** Review History */
+    get: operations["review_history_api_snippets__snippet_id__reviews_get"];
     put?: never;
     /** Start Review */
     post: operations["start_review_api_snippets__snippet_id__reviews_post"];
@@ -282,6 +283,11 @@ export interface components {
       review: components["schemas"]["ReviewRun"];
       /** Findings */
       findings: components["schemas"]["Finding"][];
+    };
+    /** ReviewHistory */
+    ReviewHistory: {
+      /** Reviews */
+      reviews: components["schemas"]["ReviewRun"][];
     };
     /** ReviewRun */
     ReviewRun: {
@@ -528,6 +534,46 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  review_history_api_snippets__snippet_id__reviews_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        snippet_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReviewHistory"];
         };
       };
       /** @description Not Found */

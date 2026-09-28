@@ -1,22 +1,23 @@
 import { useRef, useState } from "react";
 import { request, type Finding } from "./api";
-import { Discussion } from "./Discussion";
 
 export function FindingCard({
   finding,
   selected,
   onSelect,
   onUpdated,
+  onDiscuss,
+  discussing,
 }: {
   finding: Finding;
   selected: boolean;
   onSelect: (finding: Finding) => void;
   onUpdated: (finding: Finding) => void;
+  onDiscuss: (finding: Finding) => void;
+  discussing: boolean;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [discussing, setDiscussing] = useState(false);
-  const [discussionLoaded, setDiscussionLoaded] = useState(false);
   const inFlight = useRef(false);
   async function resolve(resolution: Finding["resolution"]) {
     if (inFlight.current) return;
@@ -118,18 +119,13 @@ export function FindingCard({
       </div>
       <button
         className="text-button discuss-toggle"
+        id={`discuss-${finding.id}`}
         aria-expanded={discussing}
-        aria-controls={`discussion-${finding.id}`}
-        onClick={() => {
-          setDiscussionLoaded(true);
-          setDiscussing((value) => !value);
-        }}
+        aria-controls="discussion-workspace"
+        onClick={() => onDiscuss(finding)}
       >
-        {discussing ? "Hide discussion" : "Discuss with AI"}
+        {discussing ? "Go to discussion" : "Discuss with AI"}
       </button>
-      <div id={`discussion-${finding.id}`} hidden={!discussing}>
-        {discussionLoaded && <Discussion findingId={finding.id} />}
-      </div>
       {error && (
         <p className="review-error" role="alert">
           {error}

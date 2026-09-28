@@ -11,12 +11,18 @@ import { FindingCard } from "./FindingCard";
 export function ReviewPanel({
   snippetId,
   latestReview,
+  reviewRun,
+  discussionFindingId,
+  onDiscuss,
   onStarted,
   selectedFindingId,
   onSelectFinding,
 }: {
   snippetId: string;
   latestReview: ReviewRun | null;
+  reviewRun: ReviewRun | null;
+  discussionFindingId?: string;
+  onDiscuss: (finding: Finding) => void;
   onStarted: () => void;
   selectedFindingId?: string;
   onSelectFinding: (finding: Finding) => void;
@@ -25,14 +31,16 @@ export function ReviewPanel({
   const sending = useRef(false);
   const [submitError, setSubmitError] = useState("");
   const { data, error, retry, update } = useResource<ReviewDetail>(
-    latestReview ? `/reviews/${latestReview.id}` : null,
+    reviewRun ? `/reviews/${reviewRun.id}` : null,
     (data) =>
       data.review.status === "queued" || data.review.status === "running",
   );
-  const review = data?.review ?? latestReview;
+  const review = data?.review ?? reviewRun;
+  const latestActive =
+    latestReview?.status === "queued" || latestReview?.status === "running";
   const active = review?.status === "queued" || review?.status === "running";
   async function start() {
-    if (sending.current || active) return;
+    if (sending.current || latestActive) return;
     sending.current = true;
     setSubmitting(true);
     setSubmitError("");
@@ -104,12 +112,12 @@ export function ReviewPanel({
       )}
       <button
         className="primary review-button"
-        disabled={submitting || active}
+        disabled={submitting || latestActive}
         onClick={start}
       >
         {submitting
           ? "Starting…"
-          : active
+          : latestActive
             ? "Reviewing…"
             : review?.status === "failed"
               ? "Retry review"
@@ -155,6 +163,8 @@ export function ReviewPanel({
               finding={finding}
               selected={selectedFindingId === finding.id}
               onSelect={onSelectFinding}
+              onDiscuss={onDiscuss}
+              discussing={discussionFindingId === finding.id}
               onUpdated={(saved) =>
                 update((current) => ({
                   ...current,

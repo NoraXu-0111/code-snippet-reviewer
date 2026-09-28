@@ -9,6 +9,7 @@ from .contracts import CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, F
 from .database import open_database
 from .discussion_provider import DiscussionFailure, DiscussionProvider
 from .reviews import now
+from .tracing import trace_subject
 
 
 class DiscussionConflict(Exception):
@@ -134,7 +135,8 @@ class DiscussionService:
                         if not changed:
                             return
                         snippet, finding, history = load_context(db, turn)
-                    answer = await self.provider.reply(snippet, finding, history, turn.user_message)
+                    with trace_subject(turn.id, turn.attempt):
+                        answer = await self.provider.reply(snippet, finding, history, turn.user_message)
                     self._succeed(turn, answer)
         except asyncio.CancelledError:
             self._fail(turn, "Reply interrupted by server shutdown. Please retry.")

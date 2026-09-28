@@ -1,4 +1,4 @@
-import { StrictMode, useRef, useState, type FormEvent } from "react";
+import { StrictMode, useEffect, useRef, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import {
   HashRouter,
@@ -12,6 +12,8 @@ import {
 import { CodeView } from "./CodeView";
 import type { Finding } from "./api";
 import { ReviewPanel } from "./ReviewPanel";
+import { Discussion } from "./Discussion";
+import { examples } from "./examples";
 import {
   formatDate,
   languageLabel,
@@ -20,6 +22,7 @@ import {
   statusLabels,
   useResource,
   type ReviewStatus,
+  type ReviewHistory,
   type Snippet,
   type SnippetDetail,
   type SnippetList,
@@ -257,6 +260,36 @@ function NewSnippet() {
           </p>
         </div>
       </div>
+      <section className="example-picker" aria-label="Example snippets">
+        <label htmlFor="example">Start with an example</label>
+        <select
+          id="example"
+          defaultValue=""
+          onChange={(event) => {
+            const example = examples.find(
+              (item) => item.id === event.target.value,
+            );
+            if (example) {
+              setTitle(example.title);
+              setLanguage(example.language);
+              setCode(example.code);
+            }
+            event.target.value = "";
+          }}
+          disabled={!!title || !!code || saving}
+        >
+          <option value="">Choose sample code…</option>
+          {examples.map((example) => (
+            <option key={example.id} value={example.id}>
+              {example.label}
+            </option>
+          ))}
+        </select>
+        <p className="muted small">
+          Examples fill an empty form. Save and request a review when ready; no
+          AI call starts automatically.
+        </p>
+      </section>
       <form className="panel snippet-form" onSubmit={submit}>
         <fieldset disabled={saving}>
           <div className="form-row">
@@ -321,6 +354,26 @@ function NewSnippet() {
 function Detail() {
   const { id } = useParams();
   const [selection, setSelection] = useState<Finding | null>(null);
+  const [discussed, setDiscussed] = useState<Finding | null>(null);
+  const discussionRegion = useRef<HTMLElement>(null);
+  const [params, setParams] = useSearchParams();
+  const chosenReviewId = params.get("review");
+  const history = useResource<ReviewHistory>(
+    `/snippets/${encodeURIComponent(id ?? "")}/reviews`,
+    (data) =>
+      data.reviews.some(
+        (run) => run.status === "queued" || run.status === "running",
+      ),
+  );
+  useEffect(() => {
+    if (discussed) {
+      discussionRegion.current?.scrollIntoView({
+        block: "start",
+        behavior: "instant",
+      });
+      discussionRegion.current?.focus({ preventScroll: true });
+    }
+  }, [discussed]);
   const { data, error, retry } = useResource<SnippetDetail>(
     `/snippets/${encodeURIComponent(id ?? "")}`,
     (data) =>
@@ -343,8 +396,27 @@ function Detail() {
       </p>
     );
   const { snippet, latestReview } = data;
+  const viewedReview = chosenReviewId
+    ? (history.data?.reviews.find((run) => run.id === chosenReviewId) ?? null)
+    : latestReview;
   const selectedFinding =
-    selection?.reviewRunId === latestReview?.id ? selection : null;
+    selection?.reviewRunId === viewedReview?.id ? selection : null;
+  const discussionFinding =
+    discussed?.reviewRunId === viewedReview?.id ? discussed : null;
+  if (chosenReviewId && !history.data)
+    return (
+      <ErrorPanel
+        message={history.error ?? "Loading review history…"}
+        retry={history.retry}
+      />
+    );
+  if (chosenReviewId && !viewedReview)
+    return (
+      <ErrorPanel
+        message="This review is not in this snippet’s history."
+        retry={() => setParams({})}
+      />
+    );
   const status: ReviewStatus = !latestReview
     ? "not_reviewed"
     : latestReview.status === "succeeded"
@@ -375,6 +447,40 @@ function Detail() {
         </div>
         <Status value={status} />
       </div>
+      <div className="history-toolbar">
+        <label htmlFor="review-history">Review history</label>
+        <select
+          id="review-history"
+          value={chosenReviewId ?? ""}
+          disabled={!history.data}
+          onChange={(event) => {
+            setParams(event.target.value ? { review: event.target.value } : {});
+            setSelection(null);
+            setDiscussed(null);
+          }}
+        >
+          <option value="">
+            Latest review
+            {latestReview ? ` · ${latestReview.status}` : " · none yet"}
+          </option>
+          {history.data?.reviews.map((run, index) => (
+            <option key={run.id} value={run.id}>
+              Review {history.data!.reviews.length - index} ·{" "}
+              {formatDate(run.createdAt)} · {run.status}
+            </option>
+          ))}
+        </select>
+        {history.error && (
+          <button className="text-button" onClick={history.retry}>
+            Retry loading history
+          </button>
+        )}
+        {chosenReviewId && chosenReviewId !== latestReview?.id && (
+          <span className="history-notice">
+            Viewing an earlier review. Code is unchanged.
+          </span>
+        )}
+      </div>
       <div className="detail-grid">
         <section className="panel code-panel" aria-label="Code">
           <div className="section-heading">
@@ -403,13 +509,59 @@ function Detail() {
           )}
         </section>
         <ReviewPanel
+          key={viewedReview?.id ?? "new"}
+          reviewRun={viewedReview}
+          discussionFindingId={discussionFinding?.id}
+          onDiscuss={(finding) => setDiscussed({ ...finding })}
           snippetId={snippet.id}
           latestReview={latestReview}
-          onStarted={retry}
+          onStarted={() => {
+            setParams({});
+            setDiscussed(null);
+            retry();
+            history.retry();
+          }}
           selectedFindingId={selectedFinding?.id}
           onSelectFinding={(finding) => setSelection({ ...finding })}
         />
       </div>
+      <section
+        id="discussion-workspace"
+        className="panel discussion-workspace"
+        aria-label="Discussion workspace"
+        ref={discussionRegion}
+        tabIndex={-1}
+        hidden={!discussionFinding}
+      >
+        {discussionFinding && (
+          <>
+            <div className="discussion-context">
+              <p className="eyebrow">FINDING DISCUSSION</p>
+              <h2>Let’s look closer</h2>
+              <p className="muted">
+                Lines {discussionFinding.startLine}–{discussionFinding.endLine}{" "}
+                · {discussionFinding.category}
+              </p>
+              <p>{discussionFinding.description}</p>
+              <button
+                className="text-button"
+                onClick={() => {
+                  setDiscussed(null);
+                  document
+                    .getElementById(`discuss-${discussionFinding.id}`)
+                    ?.focus();
+                }}
+              >
+                Close discussion
+              </button>
+            </div>
+            <Discussion
+              key={discussionFinding.id}
+              findingId={discussionFinding.id}
+            />
+          </>
+        )}
+      </section>
     </>
   );
 }
