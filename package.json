@@ -1,0 +1,35 @@
+{
+  "name": "code-snippet-reviewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others --names api,web \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "uv run --locked python -m backend --reload",
+    "dev:web": "vite --host 127.0.0.1",
+    "db:migrate": "uv run --locked python -m backend.database",
+    "typecheck": "tsc --noEmit",
+    "test": "uv run --locked pytest",
+    "build": "npm run typecheck && vite build",
+    "start": "uv run --locked python -m backend --serve-client",
+    "check": "npm run build && npm test",
+    "setup": "npm ci && uv sync --locked"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}

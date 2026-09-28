@@ -1,0 +1,15 @@
+node_modules/
+dist/
+data/
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+coverage/
+.venv/
+__pycache__/
+.pytest_cache/
+.uv-cache/
