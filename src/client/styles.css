@@ -1037,3 +1037,50 @@ button.finding-lines[aria-pressed="true"] {
     min-width: 0;
   }
 }
+
+.quality-intro .quality-choices {
+  margin: 20px 0;
+}
+.quality-choices legend {
+  font-size: 13px;
+  font-weight: 650;
+  color: #4e5c51;
+  margin-bottom: 10px;
+}
+.quality-choices > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.quality-intro .quality-choices label {
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #d5ddd3;
+  border-radius: 7px;
+  padding: 10px 12px;
+  cursor: pointer;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.quality-choices input {
+  margin: 0;
+  flex: 0 0 auto;
+  width: auto;
+  accent-color: #245c42;
+}
+.quality-choices .choice-selected {
+  background: #e6eee5;
+  border-color: #245c42;
+  color: #194b33;
+}
+.quality-optional {
+  margin: 18px 0;
+}
+.quality-optional > summary {
+  cursor: pointer;
+  color: #617065;
+  font-size: 13px;
+}

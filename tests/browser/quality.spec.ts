@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("human review preserves drafts, completes an uncertain assessment and exports evidence", async ({
+test("human review completes with choices only and preserves drafts and export history", async ({
   page,
 }, testInfo) => {
   await page.goto("/#/quality");
@@ -20,25 +20,29 @@ test("human review preserves drafts, completes an uncertain assessment and expor
     page.getByRole("button", { name: "Reveal proposed reference" }),
   ).toBeDisabled();
   await page
-    .getByLabel("Your observations and evidence")
-    .fill(
-      "Empty input raises ZeroDivisionError; whether it is a defect depends on the contract.",
-    );
+    .getByRole("radio", { name: "I'm not sure yet", exact: true })
+    .check();
   await page
-    .getByLabel("Input / behavior assumptions")
-    .fill("The snippet does not specify whether empty lists are valid input.");
+    .getByRole("radio", {
+      name: "Important requirements are missing",
+      exact: true,
+    })
+    .check();
   // Switching cases retains an unsaved browser draft.
   await page.getByRole("button", { name: "2. mutable-default" }).click();
   await page.getByRole("button", { name: "1. empty-average" }).click();
-  await expect(page.getByLabel("Your observations and evidence")).toContainText(
-    "ZeroDivisionError",
-  );
+  await expect(
+    page.getByRole("radio", { name: "I'm not sure yet", exact: true }),
+  ).toBeChecked();
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("revision 1");
   await page.reload();
-  await expect(page.getByLabel("Input / behavior assumptions")).toContainText(
-    "empty lists",
-  );
+  await expect(
+    page.getByRole("radio", {
+      name: "Important requirements are missing",
+      exact: true,
+    }),
+  ).toBeChecked();
   await expect(
     page.getByRole("heading", { name: "3. Assess the model outputs" }),
   ).toHaveCount(0);
@@ -47,8 +51,24 @@ test("human review preserves drafts, completes an uncertain assessment and expor
     .getByRole("combobox", { name: "Reference verdict", exact: true })
     .selectOption("uncertain");
   await page
-    .getByLabel("Reference reasoning")
-    .fill("The proposed expected bug assumes an unstated input requirement.");
+    .getByRole("radio", {
+      name: "Need the intended inputs / behavior",
+      exact: true,
+    })
+    .check();
+  // Changing a verdict clears its selected reason instead of carrying an incompatible answer.
+  await page
+    .getByRole("combobox", { name: "Reference verdict", exact: true })
+    .selectOption("needs_changes");
+  await expect(
+    page.getByRole("button", { name: "Reveal model outputs" }),
+  ).toBeDisabled();
+  await page
+    .getByRole("radio", {
+      name: "Lines, severity or explanation need correction",
+      exact: true,
+    })
+    .check();
   await page.getByRole("button", { name: "Reveal model outputs" }).click();
   // Incomplete assessments cannot be silently marked complete.
   await page.getByRole("button", { name: "Complete & next case" }).click();
@@ -67,18 +87,11 @@ test("human review preserves drafts, completes an uncertain assessment and expor
       .getByRole("combobox", { name: "Fix quality", exact: true })
       .selectOption("problem");
     await run
-      .getByLabel("Finding evidence")
-      .fill(
-        "The exception is real, but returning zero would introduce an unrequested behavior.",
-      );
+      .getByRole("radio", { name: "Need more context to judge", exact: true })
+      .check();
     await run
       .getByRole("combobox", { name: "Coverage verdict", exact: true })
       .selectOption("uncertain");
-    await run
-      .getByLabel("Coverage evidence / missed issues")
-      .fill(
-        "Need the intended empty-input behavior before judging completeness.",
-      );
   }
   await page.getByRole("button", { name: "Complete & next case" }).click();
   await expect(
@@ -90,11 +103,11 @@ test("human review preserves drafts, completes an uncertain assessment and expor
   await page.getByRole("button", { name: "1. empty-average" }).click();
   await expect(
     page.getByRole("combobox", { name: "Reference verdict", exact: true }),
-  ).toHaveValue("uncertain");
+  ).toHaveValue("needs_changes");
   await page.reload();
   await expect(
     page.getByRole("combobox", { name: "Reference verdict", exact: true }),
-  ).toHaveValue("uncertain");
+  ).toHaveValue("needs_changes");
   const href = await page
     .getByRole("link", { name: "Export saved annotations" })
     .getAttribute("href");
@@ -102,8 +115,26 @@ test("human review preserves drafts, completes an uncertain assessment and expor
   const exported = await response.json();
   expect(exported.annotations["empty-average"].status).toBe("completed");
   expect(exported.annotations["empty-average"].referenceVerdict).toBe(
-    "uncertain",
+    "needs_changes",
   );
+  expect(exported.annotations["empty-average"].referenceReason).toBe(
+    "wrong_details",
+  );
+  expect(exported.annotations["empty-average"].proposedReference).toBe("");
+  expect(exported.annotations["empty-average"].independentNotes).toBe("");
+  expect(exported.annotations["empty-average"].contractNotes).toBe("");
+  expect(exported.annotations["empty-average"].referenceNotes).toBe("");
+  expect(
+    exported.annotations["empty-average"].findings.every(
+      (f: { notes: string; reason: string }) =>
+        f.notes === "" && f.reason === "missing_context",
+    ),
+  ).toBeTruthy();
+  expect(
+    exported.annotations["empty-average"].coverage.every(
+      (c: { notes: string }) => c.notes === "",
+    ),
+  ).toBeTruthy();
   expect(exported.history).toHaveLength(2);
   expect(exported.snapshot.originalReport.promptVersion).toBe("review-v2");
   // Partial draft writes through the API must restore omitted rows as pending in the UI.
@@ -159,6 +190,8 @@ test("concurrent tabs cannot overwrite a newer human judgment", async ({
   ).toBeVisible();
   const other = await context.newPage();
   await other.goto(page.url());
+  await other.getByText("Optional code notes", { exact: true }).click();
+  await page.getByText("Optional code notes", { exact: true }).click();
   await expect(
     other.getByLabel("Your observations and evidence"),
   ).toBeVisible();

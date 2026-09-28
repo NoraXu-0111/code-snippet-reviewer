@@ -21,6 +21,7 @@ class FindingAnnotation(Contract):
     run_index: int = Field(ge=0, strict=True)
     finding_index: int = Field(ge=0, strict=True)
     verdict: Verdict = 'pending'
+    reason: Literal['pending', 'supported', 'unsupported_assumption', 'contradicts_code', 'not_actionable', 'duplicate', 'missing_context', 'needs_verification'] = 'pending'
     location: Rating = 'pending'
     severity: Rating = 'pending'
     fix: Rating = 'pending'
@@ -36,6 +37,9 @@ class CoverageAnnotation(Contract):
 class AnnotationInput(Contract):
     revision: int = Field(ge=0, strict=True)
     status: Literal['draft', 'completed'] = 'draft'
+    independent_verdict: Literal['pending', 'issue_found', 'no_issue', 'uncertain'] = 'pending'
+    contract_clarity: Literal['pending', 'sufficient', 'missing', 'uncertain'] = 'pending'
+    reference_reason: Literal['pending', 'supported', 'false_positive', 'missing_issue', 'wrong_details', 'missing_context', 'needs_verification'] = 'pending'
     independent_notes: str = Field(default='', max_length=8000)
     contract_notes: str = Field(default='', max_length=8000)
     reference_verdict: Literal['pending', 'approved', 'needs_changes', 'uncertain'] = 'pending'
@@ -196,20 +200,37 @@ def validate_annotation(case, payload):
             raise HTTPException(400, 'Failed calls cannot be marked as successful coverage')
     if payload.status != 'completed':
         return
-    required = (payload.independent_notes, payload.contract_notes, payload.reference_notes)
-    if any(not value.strip() for value in required) or payload.reference_verdict == 'pending':
-        raise HTTPException(400, 'Complete your independent assessment, input assumptions, reference verdict and evidence')
-    if payload.reference_verdict == 'needs_changes' and not payload.proposed_reference.strip():
-        raise HTTPException(400, 'Describe the corrected reference when requesting changes')
+    # Older text-only annotations remain valid. New assessments can use choices only.
+    if ((payload.independent_verdict == 'pending' and not payload.independent_notes.strip())
+            or (payload.contract_clarity == 'pending' and not payload.contract_notes.strip())
+            or payload.reference_verdict == 'pending'
+            or (payload.reference_reason == 'pending' and not payload.reference_notes.strip())):
+        raise HTTPException(400, 'Choose your code assessment, input clarity, reference verdict and reason; written notes are optional')
+    reference_reasons = {
+        'approved': {'supported'},
+        'needs_changes': {'false_positive', 'missing_issue', 'wrong_details'},
+        'uncertain': {'missing_context', 'needs_verification'},
+    }
+    if payload.reference_reason != 'pending' and payload.reference_reason not in reference_reasons[payload.reference_verdict]:
+        raise HTTPException(400, 'Reference reason must agree with the reference verdict')
     if set(keys) != expected_keys or set(coverage_keys) != runs.keys():
         raise HTTPException(400, 'Assess every finding and every run before completing this case')
     for finding in payload.findings:
-        if 'pending' in (finding.verdict, finding.location, finding.severity, finding.fix) or not finding.notes.strip():
-            raise HTTPException(400, 'Every finding needs a verdict, three ratings and supporting evidence')
+        if ('pending' in (finding.verdict, finding.location, finding.severity, finding.fix)
+                or (finding.reason == 'pending' and not finding.notes.strip())):
+            raise HTTPException(400, 'Every finding needs a verdict, three ratings and a reason; written notes are optional')
+        finding_reasons = {
+            'correct': {'supported'},
+            'incorrect': {'unsupported_assumption', 'contradicts_code', 'not_actionable'},
+            'duplicate': {'duplicate'},
+            'uncertain': {'missing_context', 'needs_verification'},
+        }
+        if finding.reason != 'pending' and finding.reason not in finding_reasons[finding.verdict]:
+            raise HTTPException(400, 'Finding reason must agree with the finding verdict')
         if not runs[finding.run_index]['findings'][finding.finding_index].get('suggestedFix') and finding.fix != 'not_applicable':
             raise HTTPException(400, 'A finding without a suggested fix must use Not applicable for fix quality')
-    if any(item.verdict == 'pending' or not item.notes.strip() for item in payload.coverage):
-        raise HTTPException(400, 'Every run needs a coverage verdict and explanation, including runs with no findings')
+    if any(item.verdict == 'pending' for item in payload.coverage):
+        raise HTTPException(400, 'Choose coverage for every run, including runs with no findings; written notes are optional')
 
 
 def quality_router(settings):

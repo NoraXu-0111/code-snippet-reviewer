@@ -87,7 +87,7 @@ See [data and API contracts](docs/data-contract.md) for invariants and implement
 
 Default model: [`gpt-4.1-mini`](https://developers.openai.com/api/docs/models/gpt-4.1-mini), configurable through `.env`. Responses and severity judgments remain model-generated suggestions; broader quality evaluation and severity calibration are future work.
 
-Validation: 69 automated backend/grader/annotation tests and 14 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
+Validation: 72 automated backend/grader/annotation tests and 14 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
 
 ## Finding interaction
 
@@ -113,7 +113,7 @@ The new-snippet form offers Python and TypeScript sample code. Examples fill onl
 
 The default `review-v2` prompt was selected after comparing three versions against a fixed ten-case development dataset. Severity agreement improved, but speculative findings on correct SQL remain a known limitation. Raw synthetic reports and prompt snapshots are committed under `evals/`; metric definitions, results, limitations, manual grading, and run commands are in [quality.md](docs/quality.md). These scores are regression indicators, not general accuracy claims.
 
-Open **Human review** in the header (or `/#/quality`) to annotate existing eval results. Choose `candidate-v2` and enter your name. Inspect the code first, validate the reference, then grade each finding and check coverage for both runs. Save drafts or complete a case to persist progress in SQLite; export includes original evidence and revision history. No new AI calls are made. See the [step-by-step annotation guide](docs/quality.md#human-annotation-workspace).
+Open **Human review** in the header (or `/#/quality`) to annotate existing eval results. Choose `candidate-v2` and enter your name. Select your code assessment, validate the reference, then grade each finding and check coverage for both runs. Common reasons are selectable and all written notes are optional, including proposed reference corrections. Save drafts or complete a case to persist progress in SQLite; export includes original evidence and revision history. No new AI calls are made. See the [step-by-step annotation guide](docs/quality.md#human-annotation-workspace).
 
 Local model-call spans record model/prompt version, job ID/attempt, timing, available token usage, provider IDs and failure class. They do not duplicate source, messages, replies, exception bodies, or API keys. View them with `npm run trace:calls`; calls made before this feature are not backfilled. See [tracing details](docs/quality.md#local-model-call-tracing).
 

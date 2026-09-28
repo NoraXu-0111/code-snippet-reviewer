@@ -243,6 +243,31 @@ export interface components {
        */
       status: "draft" | "completed";
       /**
+       * Independentverdict
+       * @default pending
+       * @enum {string}
+       */
+      independentVerdict: "pending" | "issue_found" | "no_issue" | "uncertain";
+      /**
+       * Contractclarity
+       * @default pending
+       * @enum {string}
+       */
+      contractClarity: "pending" | "sufficient" | "missing" | "uncertain";
+      /**
+       * Referencereason
+       * @default pending
+       * @enum {string}
+       */
+      referenceReason:
+        | "pending"
+        | "supported"
+        | "false_positive"
+        | "missing_issue"
+        | "wrong_details"
+        | "missing_context"
+        | "needs_verification";
+      /**
        * Independentnotes
        * @default
        */
@@ -412,6 +437,20 @@ export interface components {
        */
       verdict: "pending" | "correct" | "incorrect" | "uncertain" | "duplicate";
       /**
+       * Reason
+       * @default pending
+       * @enum {string}
+       */
+      reason:
+        | "pending"
+        | "supported"
+        | "unsupported_assumption"
+        | "contradicts_code"
+        | "not_actionable"
+        | "duplicate"
+        | "missing_context"
+        | "needs_verification";
+      /**
        * Location
        * @default pending
        * @enum {string}
@@ -569,6 +608,31 @@ export interface components {
        * @enum {string}
        */
       status: "draft" | "completed";
+      /**
+       * Independentverdict
+       * @default pending
+       * @enum {string}
+       */
+      independentVerdict: "pending" | "issue_found" | "no_issue" | "uncertain";
+      /**
+       * Contractclarity
+       * @default pending
+       * @enum {string}
+       */
+      contractClarity: "pending" | "sufficient" | "missing" | "uncertain";
+      /**
+       * Referencereason
+       * @default pending
+       * @enum {string}
+       */
+      referenceReason:
+        | "pending"
+        | "supported"
+        | "false_positive"
+        | "missing_issue"
+        | "wrong_details"
+        | "missing_context"
+        | "needs_verification";
       /**
        * Independentnotes
        * @default

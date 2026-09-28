@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Link,
   useNavigate,
@@ -27,6 +27,23 @@ const rating = z.enum([
 const draftSchema = z.object({
   revision: z.number().int().nonnegative(),
   status: z.enum(["draft", "completed"]),
+  independentVerdict: z
+    .enum(["pending", "issue_found", "no_issue", "uncertain"])
+    .default("pending"),
+  contractClarity: z
+    .enum(["pending", "sufficient", "missing", "uncertain"])
+    .default("pending"),
+  referenceReason: z
+    .enum([
+      "pending",
+      "supported",
+      "false_positive",
+      "missing_issue",
+      "wrong_details",
+      "missing_context",
+      "needs_verification",
+    ])
+    .default("pending"),
   independentNotes: z.string(),
   contractNotes: z.string(),
   referenceVerdict: z.enum([
@@ -48,6 +65,18 @@ const draftSchema = z.object({
         "uncertain",
         "duplicate",
       ]),
+      reason: z
+        .enum([
+          "pending",
+          "supported",
+          "unsupported_assumption",
+          "contradicts_code",
+          "not_actionable",
+          "duplicate",
+          "missing_context",
+          "needs_verification",
+        ])
+        .default("pending"),
       location: rating,
       severity: rating,
       fix: rating,
@@ -62,10 +91,76 @@ const draftSchema = z.object({
     }),
   ),
 });
+const referenceReasons: Record<
+  string,
+  [NonNullable<Annotation["referenceReason"]>, string][]
+> = {
+  approved: [["supported", "The code supports this reference"]],
+  needs_changes: [
+    ["false_positive", "Flags a problem that is not real"],
+    ["missing_issue", "Misses a real issue"],
+    ["wrong_details", "Lines, severity or explanation need correction"],
+  ],
+  uncertain: [
+    ["missing_context", "Need the intended inputs / behavior"],
+    ["needs_verification", "Need help verifying this"],
+  ],
+};
+const findingReasons: Record<
+  string,
+  [NonNullable<FindingMark["reason"]>, string][]
+> = {
+  correct: [["supported", "The code supports this finding"]],
+  incorrect: [
+    ["unsupported_assumption", "Assumes requirements that were not given"],
+    ["contradicts_code", "The described behavior does not match the code"],
+    ["not_actionable", "Only a preference, not an actionable problem"],
+  ],
+  duplicate: [["duplicate", "Repeats another finding in this run"]],
+  uncertain: [
+    ["missing_context", "Need more context to judge"],
+    ["needs_verification", "Need help verifying this"],
+  ],
+};
+function Choices({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: [string, string][];
+  onChange: (value: string) => void;
+}) {
+  const name = useId();
+  return (
+    <fieldset className="quality-choices">
+      <legend>{label}</legend>
+      <div>
+        {options.map(([key, text]) => (
+          <label key={key} className={value === key ? "choice-selected" : ""}>
+            <input
+              type="radio"
+              name={name}
+              value={key}
+              checked={value === key}
+              onChange={() => onChange(key)}
+            />
+            {text}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 function initial(caseData: Case, saved?: Saved): Annotation {
   const empty: Annotation = {
     revision: 0,
     status: "draft",
+    independentVerdict: "pending",
+    contractClarity: "pending",
+    referenceReason: "pending",
     independentNotes: "",
     contractNotes: "",
     referenceVerdict: "pending",
@@ -76,6 +171,7 @@ function initial(caseData: Case, saved?: Saved): Annotation {
         runIndex: run.index,
         findingIndex: index,
         verdict: "pending",
+        reason: "pending",
         location: "pending",
         severity: "pending",
         fix: finding.suggestedFix ? "pending" : "not_applicable",
@@ -138,8 +234,8 @@ export function QualityHome() {
           <p className="eyebrow">EVALUATION WORKSPACE</p>
           <h1>Human review</h1>
           <p className="muted">
-            Validate the reference, then assess every finding. Existing results;
-            no new AI calls.
+            Choose your answers, then save. Notes are optional throughout; no
+            new AI calls.
           </p>
         </div>
       </div>
@@ -147,8 +243,8 @@ export function QualityHome() {
         <h2>Your first review</h2>
         <ol>
           <li>
-            Read the code and write your own assessment before revealing the
-            reference.
+            Read the code and select your assessment before revealing the
+            reference. No written explanation is required.
           </li>
           <li>
             Confirm or challenge the proposed reference. Missing requirements
@@ -527,31 +623,68 @@ function CaseEditor({
             Reference notes below were not part of its input. Do not grade
             against hidden requirements.
           </p>
-          <label>
-            Your observations and evidence
-            <textarea
-              maxLength={8000}
-              rows={3}
-              value={draft.independentNotes}
-              onChange={(e) => change({ independentNotes: e.target.value })}
-              placeholder="What happens, on which lines? Give a minimal input and result, or explain why the code is sound."
-            />
-          </label>
-          <label>
-            Input / behavior assumptions
-            <textarea
-              maxLength={8000}
-              rows={3}
-              value={draft.contractNotes}
-              onChange={(e) => change({ contractNotes: e.target.value })}
-              placeholder="Which requirements are explicit? Which are unknown? An exception alone does not prove a bug."
-            />
-          </label>
+          <Choices
+            label="What do you think of this code?"
+            value={draft.independentVerdict ?? "pending"}
+            options={[
+              ["issue_found", "I see a potential issue"],
+              ["no_issue", "I don't see an issue"],
+              ["uncertain", "I'm not sure yet"],
+            ]}
+            onChange={(value) =>
+              change({
+                independentVerdict: value as Annotation["independentVerdict"],
+              })
+            }
+          />
+          <Choices
+            label="Are the intended inputs and behavior clear enough?"
+            value={draft.contractClarity ?? "pending"}
+            options={[
+              ["sufficient", "Enough context to judge"],
+              ["missing", "Important requirements are missing"],
+              ["uncertain", "I'm not sure"],
+            ]}
+            onChange={(value) =>
+              change({
+                contractClarity: value as Annotation["contractClarity"],
+              })
+            }
+          />
+          <details
+            className="quality-optional"
+            open={!!(draft.independentNotes || draft.contractNotes)}
+          >
+            <summary>Optional code notes</summary>
+            <label>
+              Your observations and evidence
+              <textarea
+                maxLength={8000}
+                rows={3}
+                value={draft.independentNotes}
+                onChange={(e) => change({ independentNotes: e.target.value })}
+                placeholder="What happens, on which lines? Give a minimal input and result, or explain why the code is sound."
+              />
+            </label>
+            <label>
+              Input / behavior assumptions
+              <textarea
+                maxLength={8000}
+                rows={3}
+                value={draft.contractNotes}
+                onChange={(e) => change({ contractNotes: e.target.value })}
+                placeholder="Which requirements are explicit? Which are unknown? An exception alone does not prove a bug."
+              />
+            </label>
+          </details>
           {!showReference && (
             <button
               className="secondary"
               disabled={
-                !draft.independentNotes?.trim() || !draft.contractNotes?.trim()
+                ((draft.independentVerdict ?? "pending") === "pending" &&
+                  !draft.independentNotes?.trim()) ||
+                ((draft.contractClarity ?? "pending") === "pending" &&
+                  !draft.contractNotes?.trim())
               }
               onClick={() => setShowReference(true)}
             >
@@ -601,6 +734,7 @@ function CaseEditor({
                   change({
                     referenceVerdict: e.target
                       .value as Annotation["referenceVerdict"],
+                    referenceReason: "pending",
                   })
                 }
               >
@@ -614,32 +748,61 @@ function CaseEditor({
                 </option>
               </select>
             </label>
-            <label>
-              Reference reasoning
-              <textarea
-                maxLength={8000}
-                rows={3}
-                value={draft.referenceNotes}
-                onChange={(e) => change({ referenceNotes: e.target.value })}
-                placeholder="Why is the proposed reference justified, wrong, or uncertain?"
+            {draft.referenceVerdict !== "pending" && (
+              <Choices
+                label="Why this reference verdict?"
+                value={draft.referenceReason ?? "pending"}
+                options={
+                  referenceReasons[draft.referenceVerdict ?? "pending"] ?? []
+                }
+                onChange={(value) =>
+                  change({
+                    referenceReason: value as Annotation["referenceReason"],
+                  })
+                }
               />
-            </label>
-            <label>
-              Proposed reference changes
-              <textarea
-                maxLength={8000}
-                rows={3}
-                value={draft.proposedReference}
-                onChange={(e) => change({ proposedReference: e.target.value })}
-                placeholder="Required for Needs changes. Describe issues, lines, impact and valid fix directions; use 'No issues' if appropriate. Changes requiring a new input contract need a new eval run."
-              />
-            </label>
+            )}
+            {draft.referenceVerdict === "needs_changes" && (
+              <p className="muted small">
+                You can flag this for correction without writing a replacement
+                answer. We can discuss the details later.
+              </p>
+            )}
+            <details
+              className="quality-optional"
+              open={!!(draft.referenceNotes || draft.proposedReference)}
+            >
+              <summary>Optional reference notes</summary>
+              <label>
+                Reference reasoning
+                <textarea
+                  maxLength={8000}
+                  rows={3}
+                  value={draft.referenceNotes}
+                  onChange={(e) => change({ referenceNotes: e.target.value })}
+                  placeholder="Why is the proposed reference justified, wrong, or uncertain?"
+                />
+              </label>
+              <label>
+                Proposed reference changes
+                <textarea
+                  maxLength={8000}
+                  rows={3}
+                  value={draft.proposedReference}
+                  onChange={(e) =>
+                    change({ proposedReference: e.target.value })
+                  }
+                  placeholder="Optional. You can flag a correction now and discuss the details later. Describe issues, lines, impact and valid fix directions; use 'No issues' if appropriate. Changes requiring a new input contract need a new eval run."
+                />
+              </label>
+            </details>
             {!showOutput && (
               <button
                 className="secondary"
                 disabled={
                   draft.referenceVerdict === "pending" ||
-                  !draft.referenceNotes?.trim()
+                  ((draft.referenceReason ?? "pending") === "pending" &&
+                    !draft.referenceNotes?.trim())
                 }
                 onClick={() => setShowOutput(true)}
               >
@@ -709,6 +872,7 @@ function CaseEditor({
                               markFinding(run.index, index, {
                                 verdict: e.target
                                   .value as FindingMark["verdict"],
+                                reason: "pending",
                               })
                             }
                           >
@@ -742,20 +906,40 @@ function CaseEditor({
                             }
                           />
                         </div>
-                        <label>
-                          Finding evidence
-                          <textarea
-                            maxLength={8000}
-                            rows={3}
-                            value={mark.notes}
-                            onChange={(e) =>
+                        {mark.verdict !== "pending" && (
+                          <Choices
+                            label="Why this finding verdict?"
+                            value={mark.reason ?? "pending"}
+                            options={
+                              findingReasons[mark.verdict ?? "pending"] ?? []
+                            }
+                            onChange={(value) =>
                               markFinding(run.index, index, {
-                                notes: e.target.value,
+                                reason: value as FindingMark["reason"],
                               })
                             }
-                            placeholder="Explain the verdict and rating problems. Note valid extra issues missing from the reference."
                           />
-                        </label>
+                        )}
+                        <details
+                          className="quality-optional"
+                          open={!!mark.notes}
+                        >
+                          <summary>Optional finding notes</summary>
+                          <label>
+                            Finding evidence
+                            <textarea
+                              maxLength={8000}
+                              rows={3}
+                              value={mark.notes}
+                              onChange={(e) =>
+                                markFinding(run.index, index, {
+                                  notes: e.target.value,
+                                })
+                              }
+                              placeholder="Explain the verdict and rating problems. Note valid extra issues missing from the reference."
+                            />
+                          </label>
+                        </details>
                       </section>
                     );
                   })
@@ -792,22 +976,32 @@ function CaseEditor({
                     )}
                   </select>
                 </label>
-                <label>
-                  Coverage evidence / missed issues
-                  <textarea
-                    maxLength={8000}
-                    rows={3}
-                    value={
-                      draft.coverage!.find(
-                        (item) => item.runIndex === run.index,
-                      )!.notes
-                    }
-                    onChange={(e) =>
-                      markCoverage(run.index, { notes: e.target.value })
-                    }
-                    placeholder="Name any missed issues and affected lines; explain a clean review or uncertainty. Check all issues, including proposed reference changes."
-                  />
-                </label>
+                <details
+                  className="quality-optional"
+                  open={
+                    !!draft.coverage!.find(
+                      (item) => item.runIndex === run.index,
+                    )!.notes
+                  }
+                >
+                  <summary>Optional coverage notes</summary>
+                  <label>
+                    Coverage evidence / missed issues
+                    <textarea
+                      maxLength={8000}
+                      rows={3}
+                      value={
+                        draft.coverage!.find(
+                          (item) => item.runIndex === run.index,
+                        )!.notes
+                      }
+                      onChange={(e) =>
+                        markCoverage(run.index, { notes: e.target.value })
+                      }
+                      placeholder="Name any missed issues and affected lines; explain a clean review or uncertainty. Check all issues, including proposed reference changes."
+                    />
+                  </label>
+                </details>
               </section>
             ))}
           </section>
@@ -890,9 +1084,9 @@ function CaseEditor({
           )}
         </div>
         <p className="muted small">
-          Complete requires evidence for the reference, every finding and every
-          run. “Uncertain” is a valid completed assessment; it is not an
-          approved reference. Saved revisions remain in the export.
+          Choose an answer for each question and a reason for each verdict. All
+          written notes are optional. “Uncertain” is a valid completed
+          assessment and is not an approved reference.
         </p>
       </section>
     </article>
