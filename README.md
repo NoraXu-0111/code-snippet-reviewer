@@ -2,7 +2,7 @@
 
 A local React application for submitting code snippets to an LLM and resolving individual review findings.
 
-**Current milestone: step 6, per-finding AI conversation.** Create and browse snippets, request an OpenAI review, inspect findings beside highlighted code, accept/dismiss or reopen them, and discuss each finding with the AI. Review state, resolutions, and conversations persist across reloads. Final clean-checkout verification and delivery review remain next.
+Create and browse snippets, request an OpenAI review, inspect findings beside highlighted code, accept/dismiss or reopen them, and discuss each finding with the AI. Review state, resolutions, and conversations persist across reloads. The MVP has passed clean-clone setup, build, tests, and production-startup verification; see the [verification record and demo guide](docs/verification.md).
 
 ## Run locally
 
@@ -14,7 +14,7 @@ npm run setup && npm run dev
 
 Open http://127.0.0.1:5173. The API runs on http://127.0.0.1:3001. Both processes stop together when either exits. On startup the API creates `data/reviewer.db` and applies pending migrations. No database service is needed. Snippet management works without an API key; reviews and discussion require the configuration below.
 
-Copy `.env.example` to `.env` and set `OPENAI_API_KEY` to enable reviews and discussion. `OPENAI_MODEL` defaults to `gpt-4.1-mini`; `REVIEW_TIMEOUT_SECONDS` defaults to 60. Restart the backend after changing `.env`. You can also change the API port or database path. The Vite proxy follows the configured API port. The development proxy connects over loopback; keep the default `HOST` for local development. Secrets and database files are excluded from Git.
+Before requesting an AI review, copy `.env.example` to `.env` (`cp .env.example .env`) and set `OPENAI_API_KEY` to enable reviews and discussion. `OPENAI_MODEL` defaults to `gpt-4.1-mini`; `REVIEW_TIMEOUT_SECONDS` defaults to 60. Restart the backend after changing `.env`. You can also change the API port or database path. The Vite proxy follows the configured API port. The development proxy connects over loopback; keep the default `HOST` for local development. Secrets and database files are excluded from Git.
 
 Build and run a single application process:
 
@@ -52,7 +52,7 @@ React + TypeScript + Vite ── /api ── FastAPI + Pydantic ── SQLite fi
 - SQL constraints protect persisted enum values, foreign keys, review state shape, and basic line ranges. Pydantic validation additionally checks line references against the actual code.
 - `package-lock.json` and `uv.lock` pin dependencies. The production startup serves the React build from one Python backend process.
 
-See [data and API contracts](docs/data-contract.md) for invariants and implemented endpoints, and [execution plan](docs/execution-plan.md) for the remaining milestones.
+See [data and API contracts](docs/data-contract.md) for invariants and implemented endpoints, and [execution plan](docs/execution-plan.md) for the completed milestones and scope boundaries.
 
 ## Design decisions and open scope
 
@@ -108,4 +108,4 @@ For deployment beyond a single local process, introduce a durable job worker wit
 
 ## AI usage log
 
-Development uses Codex. The ongoing record in [AI_USAGE.md](AI_USAGE.md) distinguishes generated work, design decisions, observed corrections, and validation. It will be completed with 3–5 concrete examples and an overall assessment as implementation proceeds.
+Development uses Codex. [AI_USAGE.md](AI_USAGE.md) records five concrete examples, the developer’s decisions, observed corrections, validation, and an overall assessment. [The demo guide](docs/verification.md#short-demo) walks through the main workflow.

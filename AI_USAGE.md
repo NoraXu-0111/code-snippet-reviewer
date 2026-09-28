@@ -1,6 +1,6 @@
 # AI usage log
 
-Tool: Codex. This is an ongoing development record, not a final claim that the assignment is complete.
+Tool: Codex. This record covers implementation and local verification of the MVP. It distinguishes observed outcomes from unmeasured claims.
 
 ## Example 1 — Requirements and ambiguous scope
 
@@ -22,6 +22,6 @@ Codex initially chose a TypeScript backend because the stack was undecided. The 
 
 Codex implemented SQL that selects each snippet's latest review before filtering by status, and added a regression test where an old success is followed by a failure at the same timestamp. Frontend types are generated from FastAPI OpenAPI rather than independently maintained. The generator rejected the initial TypeScript 7 dependency; Codex switched to the generator's supported TypeScript 5 instead of bypassing the peer-dependency check. This compatibility issue took extra work and illustrates why generated scaffolds still need integration checks.
 
-## Overall assessment — provisional
+## Overall assessment
 
-AI helped translate requirements into a concrete schema and connected scaffold quickly. The unconfirmed backend default caused rework. Generated configuration and model output still required review: dependency compatibility and severity calibration are examples. No measured time saving is claimed. Add the developer's own assessment before final submission.
+AI helped translate requirements into a concrete schema, connect the React/Python workflow, and exercise failure paths. The developer made the scope decisions, chose Python and OpenAI, sought clarification from the assignment author, and confirmed that the implemented conversation feature works. The unconfirmed backend default caused rework. Generated configuration and model output still required review: dependency compatibility and severity calibration are examples. Clean-clone setup, production startup, type generation, and 56 mocked automated tests passed. These checks support integration reliability, not a claim of comprehensive model accuracy. No measured time saving or personal assessment on the developer’s behalf is claimed.
