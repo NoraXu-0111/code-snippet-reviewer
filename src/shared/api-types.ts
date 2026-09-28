@@ -90,6 +90,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/findings/{finding_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Finding */
+    patch: operations["update_finding_api_findings__finding_id__patch"];
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -262,6 +279,10 @@ export interface components {
        * @enum {string}
        */
       reviewStatus: "not_reviewed" | "in_progress" | "reviewed" | "failed";
+    };
+    /** UpdateFinding */
+    UpdateFinding: {
+      resolution: components["schemas"]["Resolution"];
     };
     /** ValidationError */
     ValidationError: {
@@ -514,6 +535,59 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ReviewDetail"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_finding_api_findings__finding_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        finding_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateFinding"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Finding"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
       /** @description Not Found */

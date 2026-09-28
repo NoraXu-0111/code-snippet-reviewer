@@ -415,7 +415,8 @@ tbody tr:hover {
   min-width: max-content;
   padding: 24px 0;
 }
-.code-grid pre {
+.code-grid pre,
+.line-numbers {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12px;
@@ -426,15 +427,40 @@ tbody tr:hover {
   text-align: right;
   color: #a0aca0;
   background: #fff;
-  padding: 0 17px 0 20px;
+  padding: 0;
   user-select: none;
   position: sticky;
   left: 0;
   border-right: 1px solid #edf0e8;
+  z-index: 2;
+}
+.line-number {
+  display: block;
+  height: 1.9em;
+  padding: 0 17px 0 20px;
+}
+.line-number-selected {
+  background: #fbedbc;
+  color: #775723;
+  font-weight: 700;
+}
+.source-wrap {
+  position: relative;
+  flex: 1;
+  font-size: 12px;
+}
+.line-selection {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #fff3ca;
+  border-left: 2px solid #cba746;
+  pointer-events: none;
 }
 .source-code {
   padding: 0 24px;
   white-space: pre;
+  position: relative;
 }
 .source-code code.hljs {
   background: transparent;
@@ -599,4 +625,76 @@ tbody tr:hover {
 }
 .no-findings h3 {
   font-size: 14px;
+}
+.finding-selected {
+  background: #fafbf4;
+  box-shadow: inset 3px 0 #8ca779;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+button.finding-lines {
+  background: #f0f4eb;
+  border: 1px solid #dce5d4;
+  color: #4a6949;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 7px;
+}
+button.finding-lines:hover,
+button.finding-lines[aria-pressed="true"] {
+  background: #e3ebd9;
+  color: #2d542b;
+}
+.finding-resolution {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+.resolution-label {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 3px 7px;
+}
+.resolution-open {
+  background: #f1f2ed;
+  color: #6a7367;
+}
+.resolution-accepted {
+  background: #e7f1e5;
+  color: #416d40;
+}
+.resolution-dismissed {
+  background: #edf0f3;
+  color: #667480;
+}
+.finding-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.finding-actions button {
+  font-size: 11px;
+  padding: 6px 10px;
+}
+.saving-label,
+.resolution-help {
+  font-size: 11px;
+  color: #758174;
+  line-height: 1.6;
+}
+.resolution-help {
+  margin: 20px 0 0;
+}
+.code-selection-label {
+  padding: 8px 20px;
+  border-top: 1px solid #e5eae1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  color: #786028;
 }

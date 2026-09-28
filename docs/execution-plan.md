@@ -6,7 +6,7 @@ Target: 7 hours of planned work plus 1 hour buffer. This is a planning estimate,
 2. **Snippets (completed):** create/list/detail, metadata and filters, syntax highlighting and line numbers. Prove persistence across restart.
 3. **Review integration (completed):** create a review, invoke a real LLM, validate complete output, transactionally save findings and success/failure.
 4. **Review lifecycle (completed):** polling, clear loading/errors, manual retry, duplicate-trigger protection at the API boundary, interrupted-run recovery.
-5. **Finding interaction:** code alongside findings, line navigation, severity/category/description/fix, persistent accept/dismiss.
+5. **Finding interaction (completed):** code alongside findings, line navigation, severity/category/description/fix, persistent accept/dismiss.
 6. **Verification:** end-to-end user workflow, zero findings, malformed output, provider failure, review isolation and persistence.
 7. **Delivery:** clean setup check, architecture/tradeoffs, future work, honest AI usage examples, inspect commit history.
 

@@ -10,6 +10,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { CodeView } from "./CodeView";
+import type { Finding } from "./api";
 import { ReviewPanel } from "./ReviewPanel";
 import {
   formatDate,
@@ -319,6 +320,7 @@ function NewSnippet() {
 }
 function Detail() {
   const { id } = useParams();
+  const [selection, setSelection] = useState<Finding | null>(null);
   const { data, error, retry } = useResource<SnippetDetail>(
     `/snippets/${encodeURIComponent(id ?? "")}`,
     (data) =>
@@ -341,6 +343,8 @@ function Detail() {
       </p>
     );
   const { snippet, latestReview } = data;
+  const selectedFinding =
+    selection?.reviewRunId === latestReview?.id ? selection : null;
   const status: ReviewStatus = !latestReview
     ? "not_reviewed"
     : latestReview.status === "succeeded"
@@ -380,12 +384,30 @@ function Detail() {
               · Read-only
             </span>
           </div>
-          <CodeView code={snippet.code} language={snippet.language} />
+          <CodeView
+            code={snippet.code}
+            language={snippet.language}
+            selection={selectedFinding}
+          />
+          {selectedFinding && (
+            <div className="code-selection-label" role="status">
+              Lines {selectedFinding.startLine}–{selectedFinding.endLine}{" "}
+              selected
+              <button
+                className="text-button"
+                onClick={() => setSelection(null)}
+              >
+                Clear highlight
+              </button>
+            </div>
+          )}
         </section>
         <ReviewPanel
           snippetId={snippet.id}
           latestReview={latestReview}
           onStarted={retry}
+          selectedFindingId={selectedFinding?.id}
+          onSelectFinding={(finding) => setSelection({ ...finding })}
         />
       </div>
     </>

@@ -8,7 +8,7 @@ Codex extracted the assignment and distinguished explicit requirements from exam
 
 ## Example 2 — Review versus finding state
 
-Codex proposed separate Snippet, ReviewRun, and Finding models. The developer explicitly agreed to separate review execution state from finding resolution. The foundation implements separate tables and a database-level uniqueness constraint for active reviews. This avoids conflating “analysis finished” with “findings accepted.”
+Codex proposed separate Snippet, ReviewRun, and Finding models. The developer explicitly agreed to separate review execution state from finding resolution. The foundation implements separate tables and a database-level uniqueness constraint for active reviews. This avoids conflating “analysis finished” with “findings accepted.” The finding interaction step tests that changing a resolution leaves code, review status, and other findings unchanged. Browser verification included a stopped test server to confirm that a failed update does not falsely display an accepted state.
 
 ## Example 3 — Structured review output and failure validation
 

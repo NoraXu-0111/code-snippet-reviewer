@@ -165,6 +165,10 @@ class ReviewDetail(Contract):
     findings: list[Finding]
 
 
+class UpdateFinding(Contract):
+    resolution: Resolution
+
+
 class ErrorBody(Contract):
     code: str
     message: str

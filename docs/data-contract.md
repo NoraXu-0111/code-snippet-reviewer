@@ -25,7 +25,7 @@ Review state shape:
 
 Implemented transitions are `queued -> running -> succeeded/failed`, with `queued -> failed` allowed for interrupted startup or failure before execution. Terminal reviews are not restarted in place. A retry creates a new run. The initial migration enforces valid state shape; the task runner performs guarded transitions and marks interrupted tasks as failed during startup/shutdown.
 
-Finding resolution: `open | accepted | dismissed`. Accept means acknowledge the finding, not apply a patch. The planned update endpoint sets a resolution idempotently and allows reopening via `open`.
+Finding resolution: `open | accepted | dismissed`. Accept means acknowledge the finding, not apply a patch. The update endpoint sets a resolution idempotently and allows reopening via `open`. It only changes that finding; across clients, the last write wins.
 
 Dashboard state derives from the latest review, independently of finding resolution:
 
@@ -44,7 +44,7 @@ LLM output is `{ findings: [...] }`. Parse the entire object and check line boun
 
 `GET /api/health` is implemented. Response: `{ "status": "ok", "database": "connected" }`.
 
-Snippet and review endpoints below are implemented. Finding mutation remains planned.
+All endpoints below are implemented.
 
 | Method | Path | Contract |
 | --- | --- | --- |

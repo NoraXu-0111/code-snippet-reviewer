@@ -1,19 +1,30 @@
 import { useRef, useState } from "react";
-import { request, useResource, type ReviewDetail, type ReviewRun } from "./api";
+import {
+  request,
+  useResource,
+  type Finding,
+  type ReviewDetail,
+  type ReviewRun,
+} from "./api";
+import { FindingCard } from "./FindingCard";
 
 export function ReviewPanel({
   snippetId,
   latestReview,
   onStarted,
+  selectedFindingId,
+  onSelectFinding,
 }: {
   snippetId: string;
   latestReview: ReviewRun | null;
   onStarted: () => void;
+  selectedFindingId?: string;
+  onSelectFinding: (finding: Finding) => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const sending = useRef(false);
   const [submitError, setSubmitError] = useState("");
-  const { data, error, retry } = useResource<ReviewDetail>(
+  const { data, error, retry, update } = useResource<ReviewDetail>(
     latestReview ? `/reviews/${latestReview.id}` : null,
     (data) =>
       data.review.status === "queued" || data.review.status === "running",
@@ -118,9 +129,16 @@ export function ReviewPanel({
       )}
       {data?.review.status === "succeeded" && (
         <div className="findings">
+          {data.findings.length > 0 && (
+            <p className="resolution-help">
+              Accept acknowledges an issue; it does not change the code.
+            </p>
+          )}
           <p className="findings-count">
             {data.findings.length} finding
             {data.findings.length === 1 ? "" : "s"}
+            {data.findings.length > 0 &&
+              ` · ${data.findings.filter((finding) => finding.resolution === "open").length} open`}
           </p>
           {data.findings.length === 0 && (
             <div className="no-findings">
@@ -132,27 +150,20 @@ export function ReviewPanel({
             </div>
           )}
           {data.findings.map((finding) => (
-            <article className="finding" key={finding.id}>
-              <div className="finding-meta">
-                <span className={`severity severity-${finding.severity}`}>
-                  {finding.severity}
-                </span>
-                <span>{finding.category}</span>
-                <span className="finding-lines">
-                  L{finding.startLine}
-                  {finding.endLine !== finding.startLine
-                    ? `–${finding.endLine}`
-                    : ""}
-                </span>
-              </div>
-              <p className="finding-description">{finding.description}</p>
-              {finding.suggestedFix && (
-                <details>
-                  <summary>Suggested fix</summary>
-                  <pre className="suggested-fix">{finding.suggestedFix}</pre>
-                </details>
-              )}
-            </article>
+            <FindingCard
+              key={finding.id}
+              finding={finding}
+              selected={selectedFindingId === finding.id}
+              onSelect={onSelectFinding}
+              onUpdated={(saved) =>
+                update((current) => ({
+                  ...current,
+                  findings: current.findings.map((item) =>
+                    item.id === saved.id ? saved : item,
+                  ),
+                }))
+              }
+            />
           ))}
         </div>
       )}

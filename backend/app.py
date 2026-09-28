@@ -9,9 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import PROJECT_ROOT, Settings, get_settings
-from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList
+from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
 from .database import open_database
-from . import snippets
+from . import findings, snippets
 from .reviewer import OpenAIReviewer, Reviewer
 from .reviews import ActiveReviewError, ReviewService, get_review
 
@@ -96,6 +96,15 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
             result = get_review(db, review_id)
         if result is None:
             raise HTTPException(404, "Review not found")
+        return result
+
+    @app.patch("/api/findings/{finding_id}", response_model=Finding,
+               responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}})
+    def update_finding(finding_id: UUID, payload: UpdateFinding) -> Finding:
+        with closing(open_database(settings.database_path, migrate=False)) as db:
+            result = findings.update_resolution(db, finding_id, payload.resolution)
+        if result is None:
+            raise HTTPException(404, "Finding not found")
         return result
 
     if settings.serve_client:

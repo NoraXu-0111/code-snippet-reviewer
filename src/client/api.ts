@@ -19,6 +19,7 @@ export async function request<T>(
 }
 export type ReviewRun = components["schemas"]["ReviewRun"];
 export type ReviewDetail = components["schemas"]["ReviewDetail"];
+export type Finding = components["schemas"]["Finding"];
 export function useResource<T>(
   path: string | null,
   pollWhile?: (data: T) => boolean,
@@ -61,6 +62,12 @@ export function useResource<T>(
   return {
     ...(result.path === path ? result : {}),
     retry: () => setAttempt((value) => value + 1),
+    update: (transform: (data: T) => T) =>
+      setResult((previous) =>
+        previous.path === path && previous.data
+          ? { ...previous, data: transform(previous.data) }
+          : previous,
+      ),
   };
 }
 export const statusLabels: Record<ReviewStatus, string> = {

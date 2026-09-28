@@ -2,7 +2,7 @@
 
 A local React application for submitting code snippets to an LLM and resolving individual review findings.
 
-**Current milestone: steps 3–4, real AI reviews and review lifecycle.** Create and browse snippets, trigger an OpenAI review, follow its progress, and inspect saved findings beside highlighted code. Retry, rerun, timeout handling, and interrupted-run recovery are implemented. Accept/dismiss and clickable line navigation are the next milestone.
+**Current milestone: step 5, finding interaction.** The core workflow is implemented: create and browse snippets, trigger an OpenAI review, inspect findings beside highlighted code, locate their source lines, and accept/dismiss or reopen them. Review and resolution state persist across reloads. Discussion remains pending clarification; final delivery verification is next.
 
 ## Run locally
 
@@ -82,7 +82,15 @@ See [data and API contracts](docs/data-contract.md) for invariants and planned e
 
 Default model: [`gpt-4.1-mini`](https://developers.openai.com/api/docs/models/gpt-4.1-mini), configurable through `.env`. Responses and severity judgments remain model-generated suggestions; broader quality evaluation and severity calibration are future work.
 
-Validation: 29 automated tests (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
+Validation: 35 automated tests (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
+
+## Finding interaction
+
+- Choose a finding's line reference to scroll to and highlight its inclusive source range. The entire snippet is highlighted as one unit, preserving multi-line strings and comments; a separate overlay marks the selected lines. **Clear highlight** removes the selection.
+- **Accept** acknowledges an issue; it does not apply the suggested fix. **Dismiss** records that the finding is not being acted on. **Reopen** returns it to open. Resolved findings remain visible.
+- Buttons show a pending state while saving. UI state changes only after the backend confirms the update; failed writes preserve the previous state and show an error. The count of open findings updates immediately after successful saves.
+- Each mutation affects one finding. Source code, review execution status, other findings, and findings from earlier/later runs are unchanged. Repeated writes of the same state are idempotent. Multiple clients use last-write-wins semantics; version conflict detection is outside this local MVP.
+- Browser checks verified accept/dismiss persistence after reload, reopen, single-line and off-screen multi-line selection, and failed-write behavior against an isolated test server. These checks did not make additional OpenAI calls.
 
 ## What I would change with more time
 
