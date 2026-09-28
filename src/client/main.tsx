@@ -10,6 +10,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { CodeView } from "./CodeView";
+import { ReviewPanel } from "./ReviewPanel";
 import {
   formatDate,
   languageLabel,
@@ -56,7 +57,11 @@ function Dashboard() {
   const query = new URLSearchParams();
   if (language) query.set("language", language);
   if (status) query.set("reviewStatus", status);
-  const { data, error, retry } = useResource<SnippetList>(`/snippets?${query}`);
+  const { data, error, retry } = useResource<SnippetList>(
+    `/snippets?${query}`,
+    (data) =>
+      data.snippets.some((snippet) => snippet.reviewStatus === "in_progress"),
+  );
   function filter(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -316,6 +321,9 @@ function Detail() {
   const { id } = useParams();
   const { data, error, retry } = useResource<SnippetDetail>(
     `/snippets/${encodeURIComponent(id ?? "")}`,
+    (data) =>
+      data.latestReview?.status === "queued" ||
+      data.latestReview?.status === "running",
   );
   if (error)
     return (
@@ -374,19 +382,11 @@ function Detail() {
           </div>
           <CodeView code={snippet.code} language={snippet.language} />
         </section>
-        <aside className="panel review-panel">
-          <p className="eyebrow">REVIEW</p>
-          <h2>{latestReview ? "Review status" : "No review yet"}</h2>
-          <p className="muted">
-            Your snippet is saved. AI reviews and finding interactions are
-            coming in the next step.
-          </p>
-          {latestReview?.error && (
-            <p role="alert" className="review-error">
-              {latestReview.error}
-            </p>
-          )}
-        </aside>
+        <ReviewPanel
+          snippetId={snippet.id}
+          latestReview={latestReview}
+          onStarted={retry}
+        />
       </div>
     </>
   );

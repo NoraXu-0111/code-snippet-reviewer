@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { components } from "../shared/api-types";
 export type Snippet = components["schemas"]["Snippet"];
 export type SnippetDetail = components["schemas"]["SnippetDetail"];
@@ -17,28 +17,46 @@ export async function request<T>(
     );
   return body as T;
 }
-export function useResource<T>(path: string) {
+export type ReviewRun = components["schemas"]["ReviewRun"];
+export type ReviewDetail = components["schemas"]["ReviewDetail"];
+export function useResource<T>(
+  path: string | null,
+  pollWhile?: (data: T) => boolean,
+) {
   const [result, setResult] = useState<{
-    path: string;
+    path: string | null;
     data?: T;
     error?: string;
   }>({ path });
   const [attempt, setAttempt] = useState(0);
+  const polling = useRef(pollWhile);
+  polling.current = pollWhile;
   useEffect(() => {
     const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setResult({ path });
-    request<T>(path, { signal: controller.signal })
-      .then((data) => {
-        if (!controller.signal.aborted) setResult({ path, data });
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted)
-          setResult({
-            path,
-            error: error instanceof Error ? error.message : "Connection failed",
-          });
-      });
-    return () => controller.abort();
+    if (!path) return () => controller.abort();
+    async function refresh() {
+      try {
+        const data = await request<T>(path!, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        setResult({ path, data });
+        if (polling.current?.(data)) timer = setTimeout(refresh, 2000);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setResult((previous) => ({
+          ...previous,
+          path,
+          error: error instanceof Error ? error.message : "Connection failed",
+        }));
+        if (polling.current) timer = setTimeout(refresh, 5000);
+      }
+    }
+    void refresh();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [path, attempt]);
   return {
     ...(result.path === path ? result : {}),

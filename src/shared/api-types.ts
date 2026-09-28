@@ -56,10 +56,49 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/snippets/{snippet_id}/reviews": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Review */
+    post: operations["start_review_api_snippets__snippet_id__reviews_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/reviews/{review_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Review Detail */
+    get: operations["review_detail_api_reviews__review_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * Category
+     * @enum {string}
+     */
+    Category: "bug" | "style" | "performance" | "security";
     /** CreateSnippet */
     CreateSnippet: {
       /** Title */
@@ -80,6 +119,31 @@ export interface components {
     ErrorResponse: {
       error: components["schemas"]["ErrorBody"];
     };
+    /** Finding */
+    Finding: {
+      /** Startline */
+      startLine: number;
+      /** Endline */
+      endLine: number;
+      severity: components["schemas"]["Severity"];
+      category: components["schemas"]["Category"];
+      /** Description */
+      description: string;
+      /** Suggestedfix */
+      suggestedFix?: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Reviewrunid
+       * Format: uuid
+       */
+      reviewRunId: string;
+      /** @default open */
+      resolution: components["schemas"]["Resolution"];
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -99,6 +163,17 @@ export interface components {
        * @constant
        */
       database: "connected";
+    };
+    /**
+     * Resolution
+     * @enum {string}
+     */
+    Resolution: "open" | "accepted" | "dismissed";
+    /** ReviewDetail */
+    ReviewDetail: {
+      review: components["schemas"]["ReviewRun"];
+      /** Findings */
+      findings: components["schemas"]["Finding"][];
     };
     /** ReviewRun */
     ReviewRun: {
@@ -130,6 +205,11 @@ export interface components {
      * @enum {string}
      */
     ReviewStatus: "queued" | "running" | "succeeded" | "failed";
+    /**
+     * Severity
+     * @enum {string}
+     */
+    Severity: "critical" | "warning" | "info";
     /** Snippet */
     Snippet: {
       /** Title */
@@ -336,6 +416,104 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  start_review_api_snippets__snippet_id__reviews_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        snippet_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReviewRun"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  review_detail_api_reviews__review_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        review_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReviewDetail"];
         };
       };
       /** @description Not Found */

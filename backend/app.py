@@ -9,18 +9,26 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import PROJECT_ROOT, Settings, get_settings
-from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, HealthResponse, Snippet, SnippetDetail, SnippetList
+from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList
 from .database import open_database
 from . import snippets
+from .reviewer import OpenAIReviewer, Reviewer
+from .reviews import ActiveReviewError, ReviewService, get_review
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = None) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         open_database(settings.database_path).close()
-        yield
+        service = ReviewService(settings.database_path, reviewer or OpenAIReviewer(settings), settings.review_timeout_seconds)
+        service.recover_interrupted()
+        app.state.reviews = service
+        try:
+            yield
+        finally:
+            await service.close()
 
     app = FastAPI(title="Code Snippet Reviewer", version="0.1.0", lifespan=lifespan)
 
@@ -33,7 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, exc: StarletteHTTPException):
-        code = "not_found" if exc.status_code == 404 else "request_error"
+        code = {404: "not_found", 409: "review_in_progress", 503: "not_configured"}.get(exc.status_code, "request_error")
         return JSONResponse(status_code=exc.status_code, content={"error": {"code": code, "message": str(exc.detail)}})
 
     @app.exception_handler(Exception)
@@ -68,6 +76,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             result = snippets.get_snippet(db, snippet_id)
         if result is None:
             raise HTTPException(status_code=404, detail="Snippet not found")
+        return result
+
+    @app.post("/api/snippets/{snippet_id}/reviews", response_model=ReviewRun, status_code=202,
+              responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
+    async def start_review(snippet_id: UUID) -> ReviewRun:
+        if reviewer is None and not settings.openai_api_key:
+            raise HTTPException(503, "Set OPENAI_API_KEY in .env and restart the API to enable reviews.")
+        try:
+            return app.state.reviews.submit(snippet_id)
+        except LookupError:
+            raise HTTPException(404, "Snippet not found") from None
+        except ActiveReviewError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @app.get("/api/reviews/{review_id}", response_model=ReviewDetail, responses={404: {"model": ErrorResponse}})
+    def review_detail(review_id: UUID) -> ReviewDetail:
+        with closing(open_database(settings.database_path, migrate=False)) as db:
+            result = get_review(db, review_id)
+        if result is None:
+            raise HTTPException(404, "Review not found")
         return result
 
     if settings.serve_client:

@@ -10,9 +10,9 @@ Codex extracted the assignment and distinguished explicit requirements from exam
 
 Codex proposed separate Snippet, ReviewRun, and Finding models. The developer explicitly agreed to separate review execution state from finding resolution. The foundation implements separate tables and a database-level uniqueness constraint for active reviews. This avoids conflating “analysis finished” with “findings accepted.”
 
-## Example 3 — Generated foundation and verification
+## Example 3 — Structured review output and failure validation
 
-Codex generated the initial TypeScript/React/Fastify scaffold, SQLite migration, shared Zod contracts, and targeted tests. The initial draft used a fixed development proxy port even though the API port was configurable; Codex revised the Vite configuration to read the configured port. This is an agent self-correction, not a claimed human override.
+Codex implemented Responses API structured output backed by Pydantic, then checked line bounds separately: schema-valid output can still refer to a nonexistent source line. Tests cover refusal/incomplete output, timeouts, reruns, restart recovery, and rollback after a simulated failure on the second finding insert. Two small live checks used a synthetic averaging function; the browser review correctly identified a line-2 division-by-zero case. Its critical severity label is arguably too strong for an unspecified input contract, so successful schema/integration checks are not treated as proof of review quality. Broader severity calibration remains future work.
 
 ## Example 4 — Developer choice overrides the default backend
 
@@ -24,4 +24,4 @@ Codex implemented SQL that selects each snippet's latest review before filtering
 
 ## Overall assessment — provisional
 
-AI helped translate requirements into a concrete schema and connected scaffold quickly. The unconfirmed backend default caused rework. Generated configuration still required review for cross-file consistency, as the port mismatch illustrates. No measured time saving is claimed. Add observed LLM-integration and UI examples, and the developer's own assessment, before final submission.
+AI helped translate requirements into a concrete schema and connected scaffold quickly. The unconfirmed backend default caused rework. Generated configuration and model output still required review: dependency compatibility and severity calibration are examples. No measured time saving is claimed. Add the developer's own assessment before final submission.

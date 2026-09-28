@@ -23,7 +23,7 @@ Review state shape:
 | succeeded | required | required | null |
 | failed | optional | required | nonblank |
 
-The intended transitions are `queued -> running -> succeeded/failed`, with `queued -> failed` allowed for interrupted startup or failure before execution. Terminal reviews are not restarted in place. A retry creates a new run. The initial migration enforces valid state shape; transition operations and restart recovery are deferred to steps 3–4.
+Implemented transitions are `queued -> running -> succeeded/failed`, with `queued -> failed` allowed for interrupted startup or failure before execution. Terminal reviews are not restarted in place. A retry creates a new run. The initial migration enforces valid state shape; the task runner performs guarded transitions and marks interrupted tasks as failed during startup/shutdown.
 
 Finding resolution: `open | accepted | dismissed`. Accept means acknowledge the finding, not apply a patch. The planned update endpoint sets a resolution idempotently and allows reopening via `open`.
 
@@ -36,15 +36,15 @@ Dashboard state derives from the latest review, independently of finding resolut
 | succeeded, including zero findings | reviewed |
 | failed | failed |
 
-SQLite permits at most one queued/running review per snippet. Reruns retain their own findings and resolutions. Application queries should select the newest run by `created_at DESC, rowid DESC` to resolve timestamp ties deterministically within this SQLite MVP.
+SQLite permits at most one queued/running review per snippet. Reruns retain their own findings and resolutions. Application queries select the newest run by `created_at DESC, rowid DESC` to resolve timestamp ties deterministically within this SQLite MVP.
 
-LLM output is `{ findings: [...] }`. Parse the entire object and check line bounds before persisting it. Later review execution must save all findings and mark success in one transaction; invalid output is a failed review, never an empty successful review.
+LLM output is `{ findings: [...] }`. Parse the entire object and check line bounds before persisting it. Review execution saves all findings and marks success in one transaction; invalid output is a failed review, never an empty successful review.
 
 ## HTTP surface
 
 `GET /api/health` is implemented. Response: `{ "status": "ok", "database": "connected" }`.
 
-The create/list/detail snippet endpoints below are implemented. Review and finding mutation endpoints remain planned.
+Snippet and review endpoints below are implemented. Finding mutation remains planned.
 
 | Method | Path | Contract |
 | --- | --- | --- |
@@ -55,4 +55,4 @@ The create/list/detail snippet endpoints below are implemented. Review and findi
 | GET | /api/reviews/:id | -> `{ review, findings }`; polling source |
 | PATCH | /api/findings/:id | `{ resolution }` -> updated Finding |
 
-Error envelope: `{ error: { code, message } }`. Validation failures use 400, unknown IDs use 404, and an already active review uses 409. Unexpected server failures use 500 with a safe message. Provider failures are recorded on the asynchronous review and returned through the review endpoint. No provider SDK or key is bundled into the browser.
+Error envelope: `{ error: { code, message } }`. Validation failures use 400, unknown IDs use 404, and an already active review uses 409. Missing OpenAI configuration uses 503 without creating a run. Unexpected server failures use 500 with a safe message. Provider failures are recorded on the asynchronous review and returned through the review endpoint. No provider SDK or key is bundled into the browser.

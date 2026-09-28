@@ -160,6 +160,11 @@ class SnippetDetail(Contract):
     latest_review: ReviewRun | None
 
 
+class ReviewDetail(Contract):
+    review: ReviewRun
+    findings: list[Finding]
+
+
 class ErrorBody(Contract):
     code: str
     message: str

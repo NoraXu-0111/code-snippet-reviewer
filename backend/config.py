@@ -14,7 +14,8 @@ class Settings(BaseModel):
     database_path: Path = PROJECT_ROOT / "data/reviewer.db"
     serve_client: bool = False
     openai_api_key: SecretStr | None = Field(default=None, repr=False, exclude=True)
-    openai_model: str | None = None
+    openai_model: str = "gpt-4.1-mini"
+    review_timeout_seconds: float = Field(default=60, gt=0, le=300)
 
 
 def get_settings() -> Settings:
@@ -28,5 +29,6 @@ def get_settings() -> Settings:
         database_path=path if path.is_absolute() else PROJECT_ROOT / path,
         serve_client=os.getenv("SERVE_CLIENT", "false").lower() == "true",
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip() or None,
-        openai_model=os.getenv("OPENAI_MODEL", "").strip() or None,
+        openai_model=os.getenv("OPENAI_MODEL", "").strip() or "gpt-4.1-mini",
+        review_timeout_seconds=os.getenv("REVIEW_TIMEOUT_SECONDS", "60"),
     )
