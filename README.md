@@ -61,7 +61,7 @@ See [data and API contracts](docs/data-contract.md) for invariants and planned e
 - Each rerun creates a new review and findings. The latest review drives the dashboard; old resolutions are not copied.
 - Planned background execution is within the local backend process, with persisted status and frontend polling. Restart recovery and retry will be implemented in the review milestone; they do not exist yet.
 - Discussion is pending clarification: the overview mentions it, but the detailed requirements do not define comments versus AI conversation.
-- LLM provider/model, review timeouts, and additional language support remain to be selected during their implementation steps.
+- OpenAI is the selected LLM provider. Put `OPENAI_API_KEY` in the ignored local `.env` file; credentials are server-only and excluded from settings serialization. The model and review timeout remain to be selected during integration. Restart the API after changing `.env`. This milestone does not make OpenAI API calls yet.
 
 ## Snippet management
 
