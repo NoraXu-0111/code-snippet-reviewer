@@ -5,6 +5,16 @@ export type SnippetDetail = components["schemas"]["SnippetDetail"];
 export type SnippetList = components["schemas"]["SnippetList"];
 export type ReviewStatus =
   components["schemas"]["SnippetSummary"]["reviewStatus"];
+export type DiscussionTurn = components["schemas"]["DiscussionTurn"];
+export type DiscussionDetail = components["schemas"]["DiscussionDetail"];
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
 export async function request<T>(
   path: string,
   options?: RequestInit,
@@ -12,8 +22,13 @@ export async function request<T>(
   const response = await fetch(`/api${path}`, options);
   const body = await response.json().catch(() => null);
   if (!response.ok)
-    throw new Error(
+    throw new ApiError(
       body?.error?.message ?? `Request failed (${response.status})`,
+      response.status,
+    );
+  if (body === null)
+    throw new Error(
+      "The server returned an unreadable response. Please refresh.",
     );
   return body as T;
 }

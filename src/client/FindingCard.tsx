@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { request, type Finding } from "./api";
+import { Discussion } from "./Discussion";
 
 export function FindingCard({
   finding,
@@ -14,6 +15,8 @@ export function FindingCard({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [discussing, setDiscussing] = useState(false);
+  const [discussionLoaded, setDiscussionLoaded] = useState(false);
   const inFlight = useRef(false);
   async function resolve(resolution: Finding["resolution"]) {
     if (inFlight.current) return;
@@ -112,6 +115,20 @@ export function FindingCard({
             Reopen
           </button>
         )}
+      </div>
+      <button
+        className="text-button discuss-toggle"
+        aria-expanded={discussing}
+        aria-controls={`discussion-${finding.id}`}
+        onClick={() => {
+          setDiscussionLoaded(true);
+          setDiscussing((value) => !value);
+        }}
+      >
+        {discussing ? "Hide discussion" : "Discuss with AI"}
+      </button>
+      <div id={`discussion-${finding.id}`} hidden={!discussing}>
+        {discussionLoaded && <Discussion findingId={finding.id} />}
       </div>
       {error && (
         <p className="review-error" role="alert">

@@ -7,7 +7,7 @@ Original target: 7 hours of planned work plus 1 hour buffer, before the AI conve
 3. **Review integration (completed):** create a review, invoke a real LLM, validate complete output, transactionally save findings and success/failure.
 4. **Review lifecycle (completed):** polling, clear loading/errors, manual retry, duplicate-trigger protection at the API boundary, interrupted-run recovery.
 5. **Finding interaction (completed):** code alongside findings, line navigation, severity/category/description/fix, persistent accept/dismiss.
-6. **Per-finding AI conversation (design agreed; not implemented):** add discussion-turn persistence and request deduplication; history/send/retry endpoints; contextual OpenAI replies; expandable Discuss UI with pending/failure states and saved history. Keep finding resolution independent. Follow the [conversation design](data-contract.md#per-finding-ai-conversation--planned) for context boundaries, retry semantics, and acceptance criteria.
+6. **Per-finding AI conversation (completed):** add discussion-turn persistence and request deduplication; history/send/retry endpoints; contextual OpenAI replies; expandable Discuss UI with pending/failure states and saved history. Keep finding resolution independent. Follow the [conversation design](data-contract.md#per-finding-ai-conversation) for context boundaries, retry semantics, and acceptance criteria.
 7. **Verification:** end-to-end snippet/review/finding/discussion workflow, zero findings, malformed output, provider failure, isolation, retry, and persistence. Reproduce setup and build in a clean checkout.
 8. **Delivery:** clean setup instructions, final architecture/tradeoffs, future work, honest AI usage examples, inspect commit history.
 

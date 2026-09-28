@@ -4,7 +4,7 @@ Tool: Codex. This is an ongoing development record, not a final claim that the a
 
 ## Example 1 — Requirements and ambiguous scope
 
-Codex extracted the assignment and distinguished explicit requirements from examples and preferences. It identified that discussion appears in the overview but is absent from the detailed interaction requirements. The developer sent a clarification to the assignment author, who replied that follow-up AI conversation is preferred and either accept behavior is acceptable. The developer agreed to add per-finding AI conversation; the design and execution plan now include it as a pending implementation milestone. Acceptance continues to record resolution without applying code changes.
+Codex extracted the assignment and distinguished explicit requirements from examples and preferences. It identified that discussion appears in the overview but is absent from the detailed interaction requirements. The developer sent a clarification to the assignment author, who replied that follow-up AI conversation is preferred and either accept behavior is acceptable. The developer agreed to add per-finding AI conversation; the design, API, and UI now implement it as a separate lifecycle from finding resolution. Acceptance continues to record resolution without applying code changes. Discussion uses a persisted question/reply turn with idempotent submission and guarded retry attempts. Browser verification deliberately lost a submission response, reloaded, and recovered the same question without duplication; two real follow-ups also confirmed the integration. The added scope expanded the original execution plan rather than silently redefining the initial time estimate.
 
 ## Example 2 — Review versus finding state
 

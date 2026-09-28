@@ -698,3 +698,88 @@ button.finding-lines[aria-pressed="true"] {
   font-size: 11px;
   color: #786028;
 }
+
+.discuss-toggle {
+  margin-top: 14px;
+}
+.discussion {
+  margin-top: 14px;
+  border-top: 1px solid #e1e8df;
+  padding-top: 14px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.discussion-help,
+.discussion-empty {
+  color: #647563;
+  margin: 0 0 14px;
+}
+.discussion-history {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 480px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.discussion-history li {
+  margin-bottom: 18px;
+}
+.chat-message {
+  padding: 10px 12px;
+  border-radius: 7px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+.chat-user {
+  background: #edf3e9;
+}
+.chat-assistant {
+  background: #f6f7f4;
+}
+.chat-author {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #627660;
+}
+.chat-message p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 6px 0 0;
+}
+.chat-message button {
+  margin-top: 8px;
+}
+.discussion label {
+  display: block;
+  font-weight: 600;
+  margin: 14px 0 8px;
+}
+.discussion textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+  border: 1px solid #ccd8c9;
+  border-radius: 7px;
+  padding: 10px;
+  line-height: 1.6;
+}
+.discussion-compose-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.discussion button {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+.submission-recovery {
+  background: #fff5dc;
+  padding: 10px;
+  border-radius: 7px;
+}

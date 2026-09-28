@@ -34,12 +34,12 @@ def get_review(db: sqlite3.Connection, review_id: UUID | str) -> ReviewDetail | 
 class ReviewService:
     """Single-process local runner. SQLite records survive; tasks do not."""
 
-    def __init__(self, path: Path, reviewer: Reviewer, timeout: float):
+    def __init__(self, path: Path, reviewer: Reviewer, timeout: float, slots: asyncio.Semaphore | None = None):
         self.path = path
         self.reviewer = reviewer
         self.timeout = timeout
         self.tasks: set[asyncio.Task] = set()
-        self.slots = asyncio.Semaphore(2)
+        self.slots = slots if slots is not None else asyncio.Semaphore(2)
 
     def recover_interrupted(self) -> None:
         with closing(open_database(self.path, migrate=False)) as db:

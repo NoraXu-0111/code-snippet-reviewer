@@ -107,6 +107,41 @@ export interface paths {
     patch: operations["update_finding_api_findings__finding_id__patch"];
     trace?: never;
   };
+  "/api/findings/{finding_id}/discussion": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Discussion Detail */
+    get: operations["discussion_detail_api_findings__finding_id__discussion_get"];
+    put?: never;
+    /** Start Discussion */
+    post: operations["start_discussion_api_findings__finding_id__discussion_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/discussion-turns/{turn_id}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retry Discussion */
+    post: operations["retry_discussion_api_discussion_turns__turn_id__retry_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -116,6 +151,16 @@ export interface components {
      * @enum {string}
      */
     Category: "bug" | "style" | "performance" | "security";
+    /** CreateDiscussionTurn */
+    CreateDiscussionTurn: {
+      /** Message */
+      message: string;
+      /**
+       * Clientrequestid
+       * Format: uuid
+       */
+      clientRequestId: string;
+    };
     /** CreateSnippet */
     CreateSnippet: {
       /** Title */
@@ -124,6 +169,47 @@ export interface components {
       language: string;
       /** Code */
       code: string;
+    };
+    /** DiscussionDetail */
+    DiscussionDetail: {
+      /** Turns */
+      turns: components["schemas"]["DiscussionTurn"][];
+    };
+    /** DiscussionTurn */
+    DiscussionTurn: {
+      status: components["schemas"]["ReviewStatus"];
+      /**
+       * Createdat
+       * Format: date-time
+       */
+      createdAt: string;
+      /** Startedat */
+      startedAt?: string | null;
+      /** Finishedat */
+      finishedAt?: string | null;
+      /** Error */
+      error?: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Findingid
+       * Format: uuid
+       */
+      findingId: string;
+      /**
+       * Clientrequestid
+       * Format: uuid
+       */
+      clientRequestId: string;
+      /** Usermessage */
+      userMessage: string;
+      /** Assistantmessage */
+      assistantMessage?: string | null;
+      /** Attempt */
+      attempt: number;
     };
     /** ErrorBody */
     ErrorBody: {
@@ -186,6 +272,11 @@ export interface components {
      * @enum {string}
      */
     Resolution: "open" | "accepted" | "dismissed";
+    /** RetryDiscussionTurn */
+    RetryDiscussionTurn: {
+      /** Attempt */
+      attempt: number;
+    };
     /** ReviewDetail */
     ReviewDetail: {
       review: components["schemas"]["ReviewRun"];
@@ -194,16 +285,6 @@ export interface components {
     };
     /** ReviewRun */
     ReviewRun: {
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string;
-      /**
-       * Snippetid
-       * Format: uuid
-       */
-      snippetId: string;
       status: components["schemas"]["ReviewStatus"];
       /**
        * Createdat
@@ -216,6 +297,16 @@ export interface components {
       finishedAt?: string | null;
       /** Error */
       error?: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Snippetid
+       * Format: uuid
+       */
+      snippetId: string;
     };
     /**
      * ReviewStatus
@@ -606,6 +697,197 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  discussion_detail_api_findings__finding_id__discussion_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        finding_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiscussionDetail"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  start_discussion_api_findings__finding_id__discussion_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        finding_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateDiscussionTurn"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiscussionTurn"];
+        };
+      };
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiscussionTurn"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  retry_discussion_api_discussion_turns__turn_id__retry_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        turn_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RetryDiscussionTurn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiscussionTurn"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
     };

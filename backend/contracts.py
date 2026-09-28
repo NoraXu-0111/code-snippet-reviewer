@@ -67,9 +67,7 @@ class Snippet(CreateSnippet):
     created_at: AwareDatetime
 
 
-class ReviewRun(Contract):
-    id: UUID
-    snippet_id: UUID
+class ExecutionState(Contract):
     status: ReviewStatus
     created_at: AwareDatetime
     started_at: AwareDatetime | None = None
@@ -87,8 +85,51 @@ class ReviewRun(Contract):
         else:
             valid = self.finished_at is not None and bool(self.error and self.error.strip())
         if not valid:
-            raise ValueError("Timestamps and error must match the review status")
+            raise ValueError("Timestamps and error must match the execution status")
         return self
+
+
+class ReviewRun(ExecutionState):
+    id: UUID
+    snippet_id: UUID
+
+
+class CreateDiscussionTurn(Contract):
+    message: str = Field(min_length=1, max_length=4000)
+    client_request_id: UUID
+
+    @field_validator("message")
+    @classmethod
+    def nonblank_message(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Question must contain non-whitespace characters")
+        return value
+
+
+class RetryDiscussionTurn(Contract):
+    attempt: int = Field(strict=True, ge=1)
+
+
+class DiscussionTurn(ExecutionState):
+    id: UUID
+    finding_id: UUID
+    client_request_id: UUID
+    user_message: str = Field(min_length=1, max_length=4000)
+    assistant_message: str | None = None
+    attempt: int = Field(strict=True, ge=1)
+
+    @model_validator(mode="after")
+    def valid_answer(self) -> Self:
+        if self.status == ReviewStatus.SUCCEEDED:
+            if not self.assistant_message or not self.assistant_message.strip():
+                raise ValueError("Successful replies require an answer")
+        elif self.assistant_message is not None:
+            raise ValueError("Unsuccessful replies cannot contain an answer")
+        return self
+
+
+class DiscussionDetail(Contract):
+    turns: list[DiscussionTurn]
 
 
 class FindingContent(Contract):

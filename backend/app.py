@@ -1,8 +1,9 @@
+import asyncio
 from contextlib import asynccontextmanager, closing
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,27 +11,45 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import PROJECT_ROOT, Settings, get_settings
 from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
+from .contracts import CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, RetryDiscussionTurn
 from .database import open_database
 from . import findings, snippets
 from .reviewer import OpenAIReviewer, Reviewer
 from .reviews import ActiveReviewError, ReviewService, get_review
+from .discussion_provider import DiscussionProvider, OpenAIDiscussionProvider
+from .discussions import DiscussionConflict, DiscussionNotConfigured, DiscussionService, get_discussion
 
 
-def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = None,
+               discussion_provider: DiscussionProvider | None = None) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         open_database(settings.database_path).close()
-        service = ReviewService(settings.database_path, reviewer or OpenAIReviewer(settings), settings.review_timeout_seconds)
+        slots = asyncio.Semaphore(2)
+        service = ReviewService(settings.database_path, reviewer or OpenAIReviewer(settings), settings.review_timeout_seconds, slots)
+        discussions = DiscussionService(settings.database_path, discussion_provider or OpenAIDiscussionProvider(settings),
+                                        settings.review_timeout_seconds, slots,
+                                        configured=discussion_provider is not None or bool(settings.openai_api_key))
         service.recover_interrupted()
+        discussions.recover_interrupted()
         app.state.reviews = service
+        app.state.discussions = discussions
         try:
             yield
         finally:
-            await service.close()
+            await asyncio.gather(service.close(), discussions.close())
 
     app = FastAPI(title="Code Snippet Reviewer", version="0.1.0", lifespan=lifespan)
+
+    @app.exception_handler(DiscussionConflict)
+    async def discussion_conflict(request: Request, exc: DiscussionConflict):
+        return JSONResponse(status_code=409, content={"error": {"code": "discussion_conflict", "message": str(exc)}})
+
+    @app.exception_handler(DiscussionNotConfigured)
+    async def discussion_not_configured(request: Request, exc: DiscussionNotConfigured):
+        return JSONResponse(status_code=503, content={"error": {"code": "not_configured", "message": "Set OPENAI_API_KEY in .env and restart the API to enable discussion."}})
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
@@ -106,6 +125,35 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
         if result is None:
             raise HTTPException(404, "Finding not found")
         return result
+
+    @app.get("/api/findings/{finding_id}/discussion", response_model=DiscussionDetail,
+             responses={404: {"model": ErrorResponse}})
+    def discussion_detail(finding_id: UUID) -> DiscussionDetail:
+        with closing(open_database(settings.database_path, migrate=False)) as db:
+            try:
+                return get_discussion(db, finding_id)
+            except LookupError as exc:
+                raise HTTPException(404, str(exc)) from None
+
+    @app.post("/api/findings/{finding_id}/discussion", response_model=DiscussionTurn, status_code=202,
+              responses={200: {"model": DiscussionTurn}, 400: {"model": ErrorResponse}, 404: {"model": ErrorResponse},
+                         409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
+    async def start_discussion(finding_id: UUID, payload: CreateDiscussionTurn, response: Response) -> DiscussionTurn:
+        try:
+            turn, created = app.state.discussions.submit(finding_id, payload)
+            response.status_code = 202 if created else 200
+            return turn
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @app.post("/api/discussion-turns/{turn_id}/retry", response_model=DiscussionTurn, status_code=202,
+              responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse},
+                         409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
+    async def retry_discussion(turn_id: UUID, payload: RetryDiscussionTurn) -> DiscussionTurn:
+        try:
+            return app.state.discussions.retry(turn_id, payload.attempt)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from None
 
     if settings.serve_client:
         app.mount("/", StaticFiles(directory=PROJECT_ROOT / "dist/client", html=True), name="client")

@@ -442,7 +442,8 @@ function App() {
         </Routes>
       </main>
       <footer>
-        Code stays in your local workspace until you request an AI review.
+        Code stays in your local workspace until you request an AI review or
+        reply.
       </footer>
     </HashRouter>
   );

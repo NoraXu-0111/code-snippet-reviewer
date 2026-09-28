@@ -4,7 +4,7 @@
 
 The assignment author's clarification, supplied by the developer, says that discussion should ideally be a follow-up conversation with the AI. The developer has agreed to include **per-finding AI conversation** in the MVP. The author accepts either applying fixes or recording acceptance only; this project keeps acceptance as a persisted finding resolution, without changing source code.
 
-The snippet, review, and finding-resolution contracts below are implemented. The conversation design at the end of this document is agreed scope for the next milestone, **not implemented functionality**. It extends the existing React + FastAPI + SQLite application and uses the configured OpenAI provider.
+The snippet, review, finding-resolution, and per-finding conversation contracts below are implemented. Conversations extend the React + FastAPI + SQLite application and use the configured OpenAI provider.
 
 ## Implemented foundation
 
@@ -63,7 +63,7 @@ All endpoints below are implemented.
 
 Error envelope: `{ error: { code, message } }`. Validation failures use 400, unknown IDs use 404, and an already active review uses 409. Missing OpenAI configuration uses 503 without creating a run. Unexpected server failures use 500 with a safe message. Provider failures are recorded on the asynchronous review and returned through the review endpoint. No provider SDK or key is bundled into the browser.
 
-## Per-finding AI conversation — planned
+## Per-finding AI conversation
 
 ### User experience and boundaries
 
@@ -83,7 +83,7 @@ Snippet
             └─ DiscussionTurn (one user question + one AI reply attempt)
 ```
 
-One finding has one implicit conversation. Add a `discussion_turns` table through a new migration; do not change applied migrations. A separate conversation/session table is unnecessary for this scope.
+One finding has one implicit conversation. `002_discussion_turns.sql` adds the `discussion_turns` table without changing the initial migration. A separate conversation/session table is unnecessary for this scope.
 
 Persist each question and its reply together as a turn, rather than storing an unpaired user message and assistant message. This gives the reply a clear execution state and makes retries possible without duplicating the visible question. The UI projects a turn into user/assistant chat bubbles.
 
@@ -129,9 +129,9 @@ Failed or incomplete turns are retained in the UI but excluded from model contex
 - Users may ask a new question after a failure; failed exchanges do not enter model context. If a later question already exists, offer to copy/rephrase the old failed question as a new turn instead of retrying it out of order.
 - Shutdown cancels unfinished replies, and startup marks interrupted queued/running turns as failed with a retry message. Preserve the question and earlier answers. Provider/network errors use safe messages without exposing credentials, provider payloads, or stack traces.
 
-### Planned HTTP surface
+### Discussion HTTP surface
 
-These endpoints are not implemented yet. They use the existing camelCase conventions and error envelope.
+These endpoints are implemented and use the existing camelCase conventions and error envelope.
 
 | Method | Path | Request / response |
 | --- | --- | --- |
@@ -141,7 +141,7 @@ These endpoints are not implemented yet. They use the existing camelCase convent
 
 Use 400 for invalid input; 404 for an unknown finding/turn; 409 for an active reply, conflicting request ID, or invalid/stale retry; and 503 for missing provider configuration without creating work. Generation failures are persisted and surfaced through the discussion GET endpoint.
 
-### Acceptance criteria for implementation
+### Acceptance criteria
 
 1. Ask two follow-up questions about a finding; the second reply can use the first exchange. Two different findings never share conversation history.
 2. Refresh while generating a reply and after completion. The question, progress/failure state, and saved answers remain recoverable. Restart recovery preserves history and permits retry.
@@ -150,3 +150,7 @@ Use 400 for invalid input; 404 for an unknown finding/turn; 409 for an active re
 5. Simulate timeout, refusal, incomplete/empty output, and provider failure. No failure is displayed as a successful answer; retry does not duplicate the question, and stale completion cannot overwrite the new attempt.
 6. Re-review the snippet. New findings start with no chat history; old turns stay attached to their original finding. Existing snippet/review/finding tests continue to pass.
 7. Verify context isolation, the recent-10-exchange limit, safe answer rendering, and a real short follow-up conversation. Automated provider tests use mocks; live checks are small and explicit.
+
+### Verification record
+
+The 56-test suite includes mocked discussion/provider checks for follow-up history, finding isolation, the recent-10 context window, idempotent replay, conflicts, invalid input, missing configuration, provider failures, empty replies, refusal/truncation, queue timeout, guarded retries, restart recovery, and unchanged snippet/resolution behavior. Typecheck and production build pass. Browser checks cover a real two-turn conversation on the synthetic average snippet, persisted history, resolution independence, lost-response recovery across reload, failed-reply retry, separate finding history, and literal HTML-safe rendering. The failure checks use an isolated fake provider; only the two short successful follow-ups call OpenAI.
