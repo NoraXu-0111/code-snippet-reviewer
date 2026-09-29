@@ -54,6 +54,37 @@ Install Chromium once with `npx playwright install chromium`. E2E tests use a te
 4. **Discuss with AI** supports follow-up questions. **New conversation** starts a separate history for the same finding; **Conversation** switches histories. Each reply receives the snippet, finding, and up to ten successful exchanges from that conversation.
 5. A lost review response offers **Check submission**, reusing the same persisted request UUID even after completion or same-tab reload. **Run new review** / **Retry review** starts a deliberately new run after confirmation. Clearing browser storage removes the recovery identity. Discussion and conversation creation also support submission recovery.
 
+## Architecture
+
+```mermaid
+flowchart TB
+    UI["React + TypeScript<br/>Snippet editor, findings, conversations"]
+
+    subgraph Backend["Python backend - one process"]
+        API["FastAPI + Pydantic<br/>Routes, validation, typed contracts"]
+        Jobs["Review and discussion services<br/>Async tasks, two shared provider slots"]
+        Provider["Provider adapters<br/>Prompts and response validation"]
+        Trace["Local model-call tracing<br/>Task ID, attempt, latency, tokens, status"]
+        API -->|Queue review or reply| Jobs
+        Jobs -->|Await model result| Provider
+        Provider -.->|Record call metadata| Trace
+    end
+
+    DB[("SQLite<br/>Snippets, reviews, findings, conversations,<br/>annotations and model-call spans")]
+    OpenAI["OpenAI Responses API"]
+
+    UI -->|Commands and status polling| API
+    API -->|JSON results and progress| UI
+    API <-->|Read and write application data| DB
+    Jobs <-->|Persist job state, load context, save results| DB
+    Provider <-->|HTTPS - server-side API key| OpenAI
+    Trace -.->|Best-effort metadata writes| DB
+```
+
+Review and discussion services persist a queued job before scheduling model work; the browser polls for completion. Findings and successful review status are saved in one transaction. Tracing records metadata separately from job state, so a trace-write failure does not fail a valid review.
+
+In development, Vite serves the frontend and proxies `/api` to FastAPI. With `npm start`, FastAPI also serves the built frontend. The browser never calls OpenAI directly.
+
 ## Design and limits
 
 FastAPI/Pydantic owns the contracts; generated TypeScript types keep the React client aligned. SQLite stores domain records and transactional migrations. In-process asynchronous jobs share two provider slots, with one active review per snippet and one active reply per finding. Timeout includes queue wait. Restart marks interrupted work failed for explicit retry; this is not a durable multi-worker job system or an exactly-once provider guarantee.
