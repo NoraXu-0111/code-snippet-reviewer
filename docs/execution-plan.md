@@ -7,7 +7,7 @@ Original target: 7 hours of planned work plus 1 hour buffer, before the AI conve
 3. **Review integration (completed):** create a review, invoke a real LLM, validate complete output, transactionally save findings and success/failure.
 4. **Review lifecycle (completed):** polling, clear loading/errors, manual retry, duplicate-trigger protection at the API boundary, interrupted-run recovery.
 5. **Finding interaction (completed):** code alongside findings, line navigation, severity/category/description/fix, persistent accept/dismiss.
-6. **Per-finding AI conversation (completed):** add discussion-turn persistence and request deduplication; history/send/retry endpoints; contextual OpenAI replies; expandable Discuss UI with pending/failure states and saved history. Keep finding resolution independent. Follow the [conversation design](data-contract.md#per-finding-ai-conversation) for context boundaries, retry semantics, and acceptance criteria.
+6. **Per-finding AI conversation (completed):** add discussion-turn persistence and request deduplication; history/send/retry endpoints; contextual OpenAI replies; expandable Discuss UI with pending/failure states and saved history. Keep finding resolution independent. Follow the [conversation contract](data-contract.md#per-finding-ai-conversation) for context boundaries/retry semantics and the [verification inventory](verification.md) for coverage.
 7. **Verification (completed):** end-to-end snippet/review/finding/discussion workflow, zero findings, malformed output, provider failure, isolation, retry, and persistence. Reproduce setup and build in a clean checkout.
 8. **Delivery preparation (completed):** clean setup instructions, final architecture/tradeoffs, future work, honest AI usage examples, inspect commit history.
 
@@ -20,10 +20,15 @@ Final verification and a short demo are recorded in [verification.md](verificati
 9. **Reading and demo experience (completed):** wider discussion workspace, persisted drafts on close, keyboard focus restoration, responsive layout, safe sample-code entry points.
 10. **Review history (completed):** scoped list API and URL-persisted selector, preserving earlier findings, resolutions and conversations.
 11. **Quality evaluation and local tracing (completed):** versioned fixed fixtures/prompts, opt-in live runner, transparent candidate grading, saved results and rubric, safe model-call metadata.
-12. **Repeatable browser regression (completed):** five real-API workflows at desktop and narrow widths, isolated SQLite and deterministic providers, failure screenshots/action traces.
+12. **Repeatable browser regression (completed):** initially five workflows; now 13 scenarios at desktop and narrow widths (26 cases), isolated SQLite and deterministic providers, failure screenshots/action traces.
 
 13. **Human annotation workflow (completed):** staged independent inspection/reference validation/output assessment, frozen evaluation evidence, persisted drafts and revision conflicts, progress and full JSON export; selectable judgments/reasons with optional notes following user feedback. No automatic promotion to gold labels or new provider calls.
 
 14. **Independent conversations per finding (completed):** New conversation and history selector, preserved original chats, conversation-scoped context/drafts/retries, idempotent creation recovery, migration and browser regression coverage.
 
 These improvements were explicitly requested after the original MVP. They are additional scope, not a claim that the original time estimate included all of this work.
+
+
+15. **Independent review repairs (completed):** protect newer annotation drafts from delayed saves, recover review submissions by persisted client UUID, and read review status/findings from one database snapshot. Covered by 82 backend tests and 26 browser cases.
+
+Current architecture is summarized in [design.md](design.md). [roadmap.md](roadmap.md) prioritizes future extensions; those proposals are not completed milestones. User manual acceptance covers the main product flows, offline recovery, and restart persistence. The final manual annotation/export walkthrough was deferred; automated annotation coverage passed.

@@ -101,3 +101,16 @@ npm run trace:calls -- --database work/evals/candidate-v2/calls.db --limit 5
 The call duration excludes time waiting for the shared concurrency slot; job timestamps capture queue/lifecycle timing. A timeout during a provider call produces a cancelled span and a failed/timed-out job. A queued timeout makes no provider span. Startup marks unfinished spans interrupted. Failed SDK calls may have no token/request metadata; null means unavailable, not zero. Known failures have safe user-facing explanations on the corresponding review/turn record; the span retains an error class only. Trace writes are best effort and log only exception class if storage fails.
 
 There is no distributed tracing backend, automatic cost calculator, production dashboard, or automatic trace export. Local SQLite metadata is enough to inspect this single-process MVP without an observability service. Separately, Playwright retains a browser action/network trace and screenshot on failed tests under ignored `test-results/`; those are debugging artifacts, not model-call traces.
+
+
+## Runtime logging
+
+Uvicorn emits access and server lifecycle logs to the console. Review/discussion runners log unexpected failures with their domain ID and exception class; trace-storage warnings log only the exception class. Normal job status and safe user-facing errors are persisted in the domain tables. Logging is currently standard Python/Uvicorn output, without a configured JSON formatter, centralized sink, rotation/retention policy, or uniform HTTP request/trace correlation.
+
+The generic API exception handler uses `logger.exception` and includes a traceback/exception text. Therefore, the metadata-only trace policy is **not** a blanket claim that all console output is redacted. Before exporting production logs, introduce central redaction and structured allowlisted fields, including coverage of that handler. Application databases and browser test artifacts also contain their normal source/message content; only model-call trace rows intentionally exclude those bodies.
+
+## Extending to agent workflows
+
+Current spans identify a review or discussion attempt and its provider call. They do not have workflow IDs, parent span IDs, tool spans, or cross-process context propagation; the SQL operation enum currently allows only `review` and `discussion`. Adding other operation types requires a migration, not merely another decorator argument. Adapter-span duration excludes queue wait, and a successful model span does not imply the later domain write succeeded.
+
+The provider protocols, validated contracts, task-local context, request idempotency, guarded attempts, and deterministic provider tests can be reused. Add nested traces and correlated logs for visibility, and separate durable workflow/step records for execution/checkpointing. Observability remains best effort and must not become the authority for job state. The [prioritized roadmap](roadmap.md) describes budgets, tool permissions, durable workers, and the tests needed before such workflows are introduced. None of those extensions is implemented yet.
