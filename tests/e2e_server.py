@@ -3,6 +3,7 @@ import asyncio
 import os
 import tempfile
 from pathlib import Path
+from uuid import UUID
 
 import uvicorn
 
@@ -47,5 +48,13 @@ class Discussion:
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='snippet-reviewer-e2e-') as directory:
         settings = Settings(database_path=Path(directory)/'test.db', serve_client=True, openai_api_key=None)
-        app = create_app(settings, reviewer=Reviewer(), discussion_provider=Discussion())
+        reviewer = Reviewer()
+        app = create_app(settings, reviewer=reviewer, discussion_provider=Discussion())
+
+        @app.get('/test/reviewer-calls/{snippet_id}')
+        def reviewer_calls(snippet_id: UUID):
+            return {"calls": reviewer.calls.get(snippet_id, 0)}
+
+        # Keep the test-only counter ahead of the SPA catch-all mount.
+        app.router.routes.insert(0, app.router.routes.pop())
         uvicorn.run(app,host='127.0.0.1',port=int(os.getenv('E2E_PORT', '3032')))

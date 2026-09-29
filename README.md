@@ -53,7 +53,7 @@ React + TypeScript + Vite ── /api ── FastAPI + Pydantic ── SQLite fi
 - FastAPI exposes the implemented API schema at `/openapi.json` and interactive docs at `/docs`. Pydantic is the source of truth for backend domain validation. Frontend API types are generated from OpenAPI with `npm run api:types` and committed in `src/shared/api-types.ts`. Regenerate them after changing endpoint models.
 - SQLite uses Python's standard `sqlite3` module, avoiding a separate database service and native Node addons. Connections are scoped to each operation. Reads use regular FastAPI handlers; asynchronous task runners perform short SQLite transactions before and after provider calls.
 - Numbered SQL migrations are transactional and recorded with checksums. Applied migrations are immutable; add a new file for a schema change.
-- `Snippet`, `ReviewRun`, `Finding`, `DiscussionConversation`, and `DiscussionTurn` have separate persistence and lifecycles. Partial unique indexes prevent two active reviews per snippet or two active replies per finding; request IDs deduplicate question submissions.
+- `Snippet`, `ReviewRun`, `Finding`, `DiscussionConversation`, and `DiscussionTurn` have separate persistence and lifecycles. Partial unique indexes prevent two active reviews per snippet or two active replies per finding; request IDs deduplicate review and question submissions.
 - SQL constraints protect persisted enum values, foreign keys, review state shape, and basic line ranges. Pydantic validation additionally checks line references against the actual code.
 - `package-lock.json` and `uv.lock` pin dependencies. The production startup serves the React build from one Python backend process.
 
@@ -85,9 +85,11 @@ See [data and API contracts](docs/data-contract.md) for invariants and implement
 4. Refusal, incomplete output, invalid findings, timeout, authentication, quota, and provider errors are failures, not successful empty reviews. A completed empty findings array is a valid result.
 5. Active detail/list views poll every two seconds. Reloading restores persisted state. Graceful shutdown cancels unfinished tasks; abrupt process interruption is recovered on next startup. The **Review history** selector restores earlier runs, resolutions, and discussions. The selected run is encoded in the URL and survives reload; dashboard status still reflects the latest run.
 
+Review submissions use a client UUID persisted in this tab before sending. If the response is lost, **Check submission** safely recovers the same run, even after completion or reload. After confirmation, **Run new review** or **Retry review** deliberately starts a new run. Browser storage must be available; clearing it removes this recovery identity. API clients must send `{ "clientRequestId": "<UUID>" }` and reuse it when a submission is uncertain. This is submission deduplication, not a guarantee of exactly-once execution at the provider.
+
 Default model: [`gpt-4.1-mini`](https://developers.openai.com/api/docs/models/gpt-4.1-mini), configurable through `.env`. Responses and severity judgments remain model-generated suggestions; broader quality evaluation and severity calibration are future work.
 
-Validation: 77 automated backend/grader/annotation tests and 20 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
+Validation: 82 automated backend/grader/annotation tests and 26 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
 
 ## Finding interaction
 

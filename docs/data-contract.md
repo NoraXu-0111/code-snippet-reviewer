@@ -42,6 +42,10 @@ Dashboard state derives from the latest review, independently of finding resolut
 | succeeded, including zero findings | reviewed |
 | failed | failed |
 
+Migration `006_review_submissions.sql` stores a unique `(snippet_id, client_request_id)` mapping to a review run in the same transaction that creates the run. Existing runs and findings are preserved. Replaying a submission returns its existing queued, running, succeeded or failed run without scheduling another call, including after a restart or removal of the API key. Only a new submission needs provider configuration.
+
+The browser writes a per-snippet request UUID to session storage before sending. An uncertain response retains it through navigation and reload in that tab. **Check submission** reuses that identity; after confirmation, **Run new review** / **Retry review** creates a fresh one. Browser storage must be writable before starting a review. This prevents duplicate local submissions while the identity is retained; it does not promise exactly-once remote execution after crashes, or recovery after browser storage is cleared. Requests from other clients must also retain and reuse their UUID.
+
 SQLite permits at most one queued/running review per snippet. Reruns retain their own findings and resolutions. Application queries select the newest run by `created_at DESC, rowid DESC` to resolve timestamp ties deterministically within this SQLite MVP.
 
 LLM output is `{ findings: [...] }`. Parse the entire object and check line bounds before persisting it. Review execution saves all findings and marks success in one transaction; invalid output is a failed review, never an empty successful review.
@@ -58,8 +62,8 @@ All endpoints below are implemented.
 | GET | /api/snippets | Optional `language`, `reviewStatus`; -> `{ snippets: [...], languages: [...] }`; latest review status per row; languages across the workspace |
 | GET | /api/snippets/:id | -> `{ snippet, latestReview: ReviewRun \| null }` |
 | GET | /api/snippets/:id/reviews | -> `{ reviews: ReviewRun[] }`, newest first by `created_at DESC, rowid DESC`; unknown snippet -> 404 |
-| POST | /api/snippets/:id/reviews | -> 202 ReviewRun; 409 if an active review exists |
-| GET | /api/reviews/:id | -> `{ review, findings }`; polling source |
+| POST | /api/snippets/:id/reviews | Required `{ clientRequestId: UUID }` -> 202 ReviewRun for a new submission; 200 for a replay; 409 for a different submission while a review is active |
+| GET | /api/reviews/:id | -> `{ review, findings }` from one SQLite read snapshot; polling source |
 | PATCH | /api/findings/:id | `{ resolution }` -> updated Finding |
 
 Error envelope: `{ error: { code, message } }`. Validation failures use 400, unknown IDs use 404, and an already active review uses 409. Missing OpenAI configuration uses 503 without creating a run. Unexpected server failures use 500 with a safe message. Provider failures are recorded on the asynchronous review and returned through the review endpoint. No provider SDK or key is bundled into the browser.
@@ -180,4 +184,4 @@ Each case annotation records independent observations, visible/unknown input ass
 | PUT | /api/quality/sessions/:id/cases/:caseId | Replace this case's assessment with `{revision, status, ...}`; append a new revision |
 | GET | /api/quality/sessions/:id/export | Download original evidence, metadata, latest annotations and all revision history |
 
-Writes use a transaction and compare the client's revision with the latest stored revision (initial revision 0). A stale write returns 409 without changing prior records. All completed fields are validated server-side. Browser drafts are tab-local recovery only; exports contain saved revisions. Export reads the history and current state from one SQLite snapshot. No evaluation annotation makes a provider call, edits source code, changes a product finding's acceptance, mutates reference files, or automatically converts heuristic scores into human accuracy metrics. OpenAPI-derived types cover the annotation contracts.
+Writes use a transaction and compare the client's revision with the latest stored revision (initial revision 0). A stale write returns 409 without changing prior records. All completed fields are validated server-side. Browser drafts are tab-local recovery only; exports contain saved revisions. Save completion handlers are scoped to the mounted editor and submitted draft. A delayed response cannot erase a later draft or navigate a replacement editor; conflicting revisions remain explicit rather than silently merging human judgments. Export reads the history and current state from one SQLite snapshot. No evaluation annotation makes a provider call, edits source code, changes a product finding's acceptance, mutates reference files, or automatically converts heuristic scores into human accuracy metrics. OpenAPI-derived types cover the annotation contracts.

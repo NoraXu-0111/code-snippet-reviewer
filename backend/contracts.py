@@ -89,6 +89,10 @@ class ExecutionState(Contract):
         return self
 
 
+class CreateReview(Contract):
+    client_request_id: UUID
+
+
 class ReviewRun(ExecutionState):
     id: UUID
     snippet_id: UUID

@@ -499,6 +499,13 @@ function CaseEditor({
   onNext?: () => void;
 }) {
   const storageKey = `human-review:${session.id}:${caseData.id}`;
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const base = useRef(initial(caseData, saved));
   const [draft, setDraft] = useState<Annotation>(() => {
     try {
@@ -550,12 +557,23 @@ function CaseEditor({
   const [errorStep, setErrorStep] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [storageError, setStorageError] = useState(false);
+  const lastStoredDraft = useRef<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(base.current);
   const stale = draft.revision !== base.current.revision;
   useEffect(() => {
     try {
-      if (dirty) sessionStorage.setItem(storageKey, JSON.stringify(draft));
-      else sessionStorage.removeItem(storageKey);
+      if (dirty) {
+        const serialized = JSON.stringify(draft);
+        sessionStorage.setItem(storageKey, serialized);
+        lastStoredDraft.current = serialized;
+      } else if (
+        lastStoredDraft.current !== null &&
+        sessionStorage.getItem(storageKey) === lastStoredDraft.current
+      ) {
+        // Reverting all edits may clear only this editor's last stored draft.
+        sessionStorage.removeItem(storageKey);
+        lastStoredDraft.current = null;
+      }
       setStorageError(false);
     } catch {
       setStorageError(true);
@@ -617,6 +635,7 @@ function CaseEditor({
   }
   async function save(status: "draft" | "completed", next = false) {
     if (busyRef.current) return;
+    const submittedDraft = JSON.stringify(draft);
     busyRef.current = true;
     setBusy(true);
     setError("");
@@ -631,12 +650,15 @@ function CaseEditor({
           body: JSON.stringify({ ...draft, status }),
         },
       );
+      // A previous editor must not clear storage, update this case, or navigate.
+      if (!mounted.current) return;
       base.current = initial(caseData, result);
       setDraft(base.current);
       onSaved(result);
-      // Remove the previous draft before navigation can unmount this editor.
+      // Clear only the exact draft submitted by this editor.
       try {
-        sessionStorage.removeItem(storageKey);
+        if (sessionStorage.getItem(storageKey) === submittedDraft)
+          sessionStorage.removeItem(storageKey);
       } catch {
         /* Explicit save succeeded. */
       }
@@ -645,6 +667,7 @@ function CaseEditor({
       );
       if (next) onNext?.();
     } catch (error) {
+      if (!mounted.current) return;
       setError(
         error instanceof Error
           ? error.message
@@ -652,7 +675,7 @@ function CaseEditor({
       );
     } finally {
       busyRef.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
   return (

@@ -286,3 +286,78 @@ test("lost new conversation response recovers one conversation after reload", as
     page.getByLabel("Ask a follow-up", { exact: true }),
   ).toBeEnabled();
 });
+
+for (const reload of [false, true]) {
+  test(`lost review submission recovers once ${reload ? "after reload" : "without reload"}`, async ({
+    page,
+  }) => {
+    await create(page);
+    const snippetId = page.url().split("/snippets/")[1]!.split("?")[0];
+    const url = `/api/snippets/${snippetId}/reviews`;
+    const identities: string[] = [];
+    let drop = true;
+    await page.route(`**${url}`, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      identities.push(route.request().postDataJSON().clientRequestId);
+      const response = await route.fetch();
+      expect(response.ok()).toBeTruthy();
+      if (drop) {
+        drop = false;
+        await route.abort("failed");
+      } else await route.fulfill({ response });
+    });
+    await page
+      .getByRole("button", { name: "Review snippet", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Check submission", exact: true }),
+    ).toBeEnabled();
+    await expect
+      .poll(async () => {
+        const history = await (await page.request.get(url)).json();
+        return history.reviews[0]?.status;
+      })
+      .toBe("succeeded");
+    if (reload) await page.reload();
+    await page
+      .getByRole("button", { name: "Check submission", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Run new review", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      page.getByText("Empty input causes division by zero.", { exact: true }),
+    ).toBeVisible();
+    expect(identities).toHaveLength(2);
+    expect(identities[1]).toBe(identities[0]);
+    expect((await (await page.request.get(url)).json()).reviews).toHaveLength(
+      1,
+    );
+    expect(
+      (
+        await (
+          await page.request.get(`/test/reviewer-calls/${snippetId}`)
+        ).json()
+      ).calls,
+    ).toBe(1);
+    // An explicit new review now uses a fresh identity and invokes the provider once more.
+    await page
+      .getByRole("button", { name: "Run new review", exact: true })
+      .click();
+    await expect
+      .poll(
+        async () =>
+          (
+            await (
+              await page.request.get(`/test/reviewer-calls/${snippetId}`)
+            ).json()
+          ).calls,
+      )
+      .toBe(2);
+    expect(identities).toHaveLength(3);
+    expect(identities[2]).not.toBe(identities[0]);
+    expect((await (await page.request.get(url)).json()).reviews).toHaveLength(
+      2,
+    );
+  });
+}

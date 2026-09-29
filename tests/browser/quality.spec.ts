@@ -288,3 +288,89 @@ test("footer advances saved first-step drafts instead of showing a disabled comp
   expect(stored.annotations["empty-average"].revision).toBe(1);
   expect(stored.annotations["empty-average"].status).toBe("draft");
 });
+
+test("a delayed annotation save cannot erase a newer editor's draft", async ({
+  page,
+}) => {
+  await page.goto("/#/quality");
+  await page.getByLabel("Reviewer name").fill(`Delayed save ${Date.now()}`);
+  await page.getByRole("button", { name: "Start / resume review" }).click();
+  await page.getByText("Optional code notes", { exact: true }).click();
+  // Reverting to the saved baseline must not resurrect a previously typed draft.
+  await page
+    .getByLabel("Your observations and evidence")
+    .fill("Discarded edit");
+  await page.getByLabel("Your observations and evidence").fill("");
+  await page.getByRole("button", { name: "2. mutable-default" }).click();
+  await page.getByRole("button", { name: "1. empty-average" }).click();
+  await page.getByText("Optional code notes", { exact: true }).click();
+  await expect(page.getByLabel("Your observations and evidence")).toHaveValue(
+    "",
+  );
+  await page
+    .getByLabel("Your observations and evidence")
+    .fill("Original submitted evidence");
+  let release!: () => void;
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let persisted!: () => void;
+  const saved = new Promise<void>((resolve) => {
+    persisted = resolve;
+  });
+  let delivered!: () => void;
+  const responseDelivered = new Promise<void>((resolve) => {
+    delivered = resolve;
+  });
+  await page.route(
+    "**/api/quality/sessions/*/cases/empty-average",
+    async (route) => {
+      if (route.request().method() !== "PUT") return route.continue();
+      const response = await route.fetch();
+      expect(response.ok()).toBeTruthy();
+      persisted();
+      await delayed;
+      await route.fulfill({ response });
+      delivered();
+    },
+  );
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await saved;
+  try {
+    await page.getByRole("button", { name: "2. mutable-default" }).click();
+    await page.getByRole("button", { name: "1. empty-average" }).click();
+    await page
+      .getByLabel("Your observations and evidence")
+      .fill("Newer unsaved evidence must survive");
+    release();
+    await responseDelivered;
+    // Let the old fetch handler run before checking its storage side effects.
+    await page.evaluate(
+      () => new Promise((resolve) => setTimeout(resolve, 50)),
+    );
+    await expect(page.getByLabel("Your observations and evidence")).toHaveValue(
+      "Newer unsaved evidence must survive",
+    );
+    await page.getByRole("button", { name: "2. mutable-default" }).click();
+    await page.getByRole("button", { name: "1. empty-average" }).click();
+    await expect(page.getByLabel("Your observations and evidence")).toHaveValue(
+      "Newer unsaved evidence must survive",
+    );
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.reload();
+    await expect(page.getByLabel("Your observations and evidence")).toHaveValue(
+      "Newer unsaved evidence must survive",
+    );
+    // Server revision conflicts remain explicit; the new browser draft is never overwritten.
+    const sessionId = page.url().split("/quality/")[1]!.split("?")[0];
+    const server = await (
+      await page.request.get(`/api/quality/sessions/${sessionId}`)
+    ).json();
+    expect(server.annotations["empty-average"].independentNotes).toBe(
+      "Original submitted evidence",
+    );
+    expect(server.annotations["empty-average"].revision).toBe(1);
+  } finally {
+    release();
+  }
+});

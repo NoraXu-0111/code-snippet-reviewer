@@ -365,6 +365,14 @@ export interface components {
        */
       clientRequestId: string;
     };
+    /** CreateReview */
+    CreateReview: {
+      /**
+       * Clientrequestid
+       * Format: uuid
+       */
+      clientRequestId: string;
+    };
     /** CreateSnippet */
     CreateSnippet: {
       /** Title */
@@ -1061,8 +1069,21 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateReview"];
+      };
+    };
     responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReviewRun"];
+        };
+      };
       /** @description Successful Response */
       202: {
         headers: {
@@ -1070,6 +1091,15 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ReviewRun"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
       /** @description Not Found */

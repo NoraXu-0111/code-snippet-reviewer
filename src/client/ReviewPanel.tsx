@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   request,
   useResource,
@@ -27,6 +27,21 @@ export function ReviewPanel({
   selectedFindingId?: string;
   onSelectFinding: (finding: Finding) => void;
 }) {
+  const storageKey = `review-submission:${snippetId}`;
+  const [pending, setPending] = useState(() => {
+    try {
+      return sessionStorage.getItem(storageKey);
+    } catch {
+      return null;
+    }
+  });
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [submitting, setSubmitting] = useState(false);
   const sending = useRef(false);
   const [submitError, setSubmitError] = useState("");
@@ -40,22 +55,41 @@ export function ReviewPanel({
     latestReview?.status === "queued" || latestReview?.status === "running";
   const active = review?.status === "queued" || review?.status === "running";
   async function start() {
-    if (sending.current || latestActive) return;
+    if (sending.current || (latestActive && !pending)) return;
     sending.current = true;
     setSubmitting(true);
     setSubmitError("");
     try {
+      // Persist before sending: a lost response/reload must reuse this identity.
+      let requestId: string;
+      try {
+        requestId = sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+        sessionStorage.setItem(storageKey, requestId);
+      } catch {
+        throw new Error(
+          "Browser storage is unavailable. Enable it before starting a review so interrupted submissions can be recovered.",
+        );
+      }
+      setPending(requestId);
       await request<ReviewRun>(`/snippets/${snippetId}/reviews`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientRequestId: requestId }),
       });
+      if (!mounted.current) return;
+      // Storage failure keeps recovery available; replaying is safe.
+      if (sessionStorage.getItem(storageKey) === requestId)
+        sessionStorage.removeItem(storageKey);
+      setPending(null);
       onStarted();
     } catch (error) {
+      if (!mounted.current) return;
       setSubmitError(
         error instanceof Error ? error.message : "Could not start the review.",
       );
     } finally {
       sending.current = false;
-      setSubmitting(false);
+      if (mounted.current) setSubmitting(false);
     }
   }
   return (
@@ -102,6 +136,12 @@ export function ReviewPanel({
           </button>
         </p>
       )}
+      {pending && (
+        <p className="review-disclosure" role="status">
+          A submission is awaiting confirmation. Check submission safely
+          recovers the same review, even if it has already finished.
+        </p>
+      )}
       {error && (
         <div className="review-error" role="alert">
           Unable to refresh this review: {error}
@@ -112,18 +152,20 @@ export function ReviewPanel({
       )}
       <button
         className="primary review-button"
-        disabled={submitting || latestActive}
+        disabled={submitting || (latestActive && !pending)}
         onClick={start}
       >
         {submitting
           ? "Starting…"
-          : latestActive
-            ? "Reviewing…"
-            : review?.status === "failed"
-              ? "Retry review"
-              : review
-                ? "Run new review"
-                : "Review snippet"}
+          : pending
+            ? "Check submission"
+            : latestActive
+              ? "Reviewing…"
+              : review?.status === "failed"
+                ? "Retry review"
+                : review
+                  ? "Run new review"
+                  : "Review snippet"}
       </button>
       {!active && (
         <p className="review-disclosure">

@@ -10,14 +10,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import PROJECT_ROOT, Settings, get_settings
-from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
+from .contracts import CreateReview, CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
 from .contracts import CreateConversation, DiscussionConversation, CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, RetryDiscussionTurn, ReviewHistory
 from .database import open_database
 from .tracing import recover_traces
 from . import findings, snippets
 from .quality import quality_router
 from .reviewer import OpenAIReviewer, Reviewer
-from .reviews import ActiveReviewError, ReviewService, get_review
+from .reviews import ActiveReviewError, ReviewNotConfigured, ReviewService, get_review
 from .discussion_provider import DiscussionProvider, OpenAIDiscussionProvider
 from .discussions import DiscussionConflict, DiscussionNotConfigured, DiscussionService, get_discussion, create_conversation
 
@@ -30,7 +30,8 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
     async def lifespan(app: FastAPI):
         open_database(settings.database_path).close()
         slots = asyncio.Semaphore(2)
-        service = ReviewService(settings.database_path, reviewer or OpenAIReviewer(settings), settings.review_timeout_seconds, slots)
+        service = ReviewService(settings.database_path, reviewer or OpenAIReviewer(settings), settings.review_timeout_seconds, slots,
+                                configured=reviewer is not None or bool(settings.openai_api_key))
         discussions = DiscussionService(settings.database_path, discussion_provider or OpenAIDiscussionProvider(settings),
                                         settings.review_timeout_seconds, slots,
                                         configured=discussion_provider is not None or bool(settings.openai_api_key))
@@ -110,12 +111,14 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
             return ReviewHistory(reviews=[ReviewRun.model_validate(dict(row)) for row in rows])
 
     @app.post("/api/snippets/{snippet_id}/reviews", response_model=ReviewRun, status_code=202,
-              responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
-    async def start_review(snippet_id: UUID) -> ReviewRun:
-        if reviewer is None and not settings.openai_api_key:
-            raise HTTPException(503, "Set OPENAI_API_KEY in .env and restart the API to enable reviews.")
+              responses={200: {"model": ReviewRun}, 400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
+    async def start_review(snippet_id: UUID, payload: CreateReview, response: Response) -> ReviewRun:
         try:
-            return app.state.reviews.submit(snippet_id)
+            run, created = app.state.reviews.submit(snippet_id, payload.client_request_id)
+            response.status_code = 202 if created else 200
+            return run
+        except ReviewNotConfigured:
+            raise HTTPException(503, "Set OPENAI_API_KEY in .env and restart the API to enable reviews.") from None
         except LookupError:
             raise HTTPException(404, "Snippet not found") from None
         except ActiveReviewError as exc:

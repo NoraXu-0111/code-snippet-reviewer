@@ -21,21 +21,34 @@ class ActiveReviewError(Exception):
     pass
 
 
+class ReviewNotConfigured(Exception):
+    pass
+
+
 def get_review(db: sqlite3.Connection, review_id: UUID | str) -> ReviewDetail | None:
-    run = db.execute("SELECT * FROM review_runs WHERE id = ?", (str(review_id),)).fetchone()
-    if run is None:
-        return None
-    findings = db.execute("SELECT * FROM findings WHERE review_run_id = ? ORDER BY rowid", (str(review_id),)).fetchall()
-    return ReviewDetail(
-        review=ReviewRun.model_validate(dict(run)),
-        findings=[Finding.model_validate(dict(row)) for row in findings],
-    )
+    # Reuse a caller's transaction without committing or rolling it back.
+    owns_transaction = not db.in_transaction
+    if owns_transaction:
+        db.execute("BEGIN")
+    try:
+        run = db.execute("SELECT * FROM review_runs WHERE id = ?", (str(review_id),)).fetchone()
+        if run is None:
+            return None
+        findings = db.execute("SELECT * FROM findings WHERE review_run_id = ? ORDER BY rowid", (str(review_id),)).fetchall()
+        return ReviewDetail(
+            review=ReviewRun.model_validate(dict(run)),
+            findings=[Finding.model_validate(dict(row)) for row in findings],
+        )
+    finally:
+        if owns_transaction:
+            db.rollback()  # Release this read snapshot on every return/error path.
 
 
 class ReviewService:
     """Single-process local runner. SQLite records survive; tasks do not."""
 
-    def __init__(self, path: Path, reviewer: Reviewer, timeout: float, slots: asyncio.Semaphore | None = None):
+    def __init__(self, path: Path, reviewer: Reviewer, timeout: float, slots: asyncio.Semaphore | None = None, *, configured: bool = True):
+        self.configured = configured
         self.path = path
         self.reviewer = reviewer
         self.timeout = timeout
@@ -49,24 +62,43 @@ class ReviewService:
                 (now(), "Review interrupted by a server restart. Please retry."),
             )
 
-    def submit(self, snippet_id: UUID) -> ReviewRun:
+    def submit(self, snippet_id: UUID, client_request_id: UUID) -> tuple[ReviewRun, bool]:
         with closing(open_database(self.path, migrate=False)) as db:
-            detail = get_snippet(db, snippet_id)
-            if detail is None:
-                raise LookupError("Snippet not found")
-            run = ReviewRun(id=uuid4(), snippet_id=snippet_id, status=ReviewStatus.QUEUED, created_at=now())
+            db.execute("BEGIN IMMEDIATE")
             try:
+                # Recover before active-job and configuration checks, even for terminal runs.
+                previous = db.execute("""SELECT r.* FROM review_runs r
+                    JOIN review_submissions s ON s.review_run_id = r.id
+                    WHERE s.snippet_id = ? AND s.client_request_id = ?""",
+                    (str(snippet_id), str(client_request_id))).fetchone()
+                if previous is not None:
+                    db.commit()
+                    return ReviewRun.model_validate(dict(previous)), False
+                detail = get_snippet(db, snippet_id)
+                if detail is None:
+                    raise LookupError("Snippet not found")
+                if not self.configured:
+                    raise ReviewNotConfigured()
+                run = ReviewRun(id=uuid4(), snippet_id=snippet_id, status=ReviewStatus.QUEUED, created_at=now())
                 db.execute("INSERT INTO review_runs VALUES (?, ?, ?, ?, ?, ?, ?)", (
                     str(run.id), str(snippet_id), run.status.value, run.created_at.isoformat(), None, None, None,
                 ))
+                db.execute("INSERT INTO review_submissions VALUES (?, ?, ?)", (
+                    str(snippet_id), str(client_request_id), str(run.id),
+                ))
+                db.commit()
             except sqlite3.IntegrityError as exc:
+                db.rollback()
                 if exc.sqlite_errorname == "SQLITE_CONSTRAINT_UNIQUE":
                     raise ActiveReviewError("This snippet already has a review in progress.") from None
+                raise
+            except Exception:
+                db.rollback()
                 raise
         task = asyncio.create_task(self._execute(run, detail.snippet))
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
-        return run
+        return run, True
 
     def _fail(self, review_id: UUID, message: str) -> None:
         with closing(open_database(self.path, migrate=False)) as db:
