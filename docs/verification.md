@@ -2,7 +2,7 @@
 
 ## Current verification status
 
-Latest verification covers the OpenAI model-selection milestone: **88 backend tests and 30 browser cases passed**, along with TypeScript and production build. Generated API types include the model catalog and model fields. The earlier independent-review repairs were committed in `91c4fd5`; this milestone adds selection without weakening their replay/draft protections.
+Latest verification covers OpenAI model selection, including GPT-5.5 and GPT-5.6 Sol: **90 backend tests and 30 browser cases passed**, along with TypeScript and production build. Generated API types include the model catalog and model fields. The earlier independent-review repairs were committed in `91c4fd5`; this milestone adds selection without weakening their replay/draft protections.
 
 The browser suite has **15 scenarios run twice** in Chromium: desktop 1280 x 900 and narrow 390 x 844. It uses the real React app, FastAPI routes, a temporary SQLite database, and deterministic providers. Backend provider-adapter tests mock SDK responses. Automated checks do not call a paid model or modify the user's database. Failed browser tests retain screenshots and action/network traces under ignored `test-results/`.
 
@@ -27,7 +27,7 @@ Counts include parametrized cases. All current backend test modules are listed h
 | [test_foundation.py](../tests/test_foundation.py) | Persistence; repeatable and failed/rolled-back migrations; foreign keys, state/line constraints; active review uniqueness across connections; validation and JSON naming; API startup/health |
 | [test_snippets.py](../tests/test_snippets.py) | Create/list/detail; invalid input; reload after app restart; language/latest-review filters and combinations; timestamp ties; unknown IDs and query validation |
 | [test_reviews.py](../tests/test_reviews.py) | Async lifecycle; active submission conflicts; empty/invalid output; provider failure/timeout; atomic findings rollback; shutdown/startup recovery; missing configuration; required request UUID; replay after success/failure/restart without a key; per-snippet identity; consistent detail reads with concurrent completion and transaction cleanup |
-| [test_models.py](../tests/test_models.py) | Configured/catalog defaults; selected models reaching real adapters with mocked SDKs; concurrent model isolation; history/trace identity; replay conflicts; recovery without a key after default changes; fixed-model retry; invalid choices; evidence-only legacy migration |
+| [test_models.py](../tests/test_models.py) | Configured/catalog defaults; selected models reaching real adapters with mocked SDKs, including GPT-5.5/GPT-5.6 Sol request options; concurrent model isolation; history/trace identity; replay conflicts; recovery without a key after default changes; fixed-model retry; invalid choices; evidence-only legacy migration |
 | [test_openai_reviewer.py](../tests/test_openai_reviewer.py) | Structured request schema, numbered/untrusted source, request controls; refusal/incomplete/missing parsed output treated as failure |
 | [test_findings.py](../tests/test_findings.py) | Resolution persistence and reopening; code, other findings, and other runs unchanged; invalid updates and missing IDs |
 | [test_review_history.py](../tests/test_review_history.py) | Snippet-scoped ordering and preservation of previous resolutions |
@@ -51,7 +51,7 @@ Product scenarios in [workflow.spec.ts](../tests/browser/workflow.spec.ts):
 7. Drop a new-conversation response and recover the same conversation after reload.
 8. Drop a persisted review response, let the run complete, and recover without reload: one run and one mock provider call; deliberate rerun creates a new request and second call.
 9. Repeat the review-recovery scenario after reload. Both recovery tests also change the browser preference while a request is uncertain and verify its original model remains fixed.
-10. Remember model selection across reloads; preserve review/reply model labels; keep a failed reply's original model on retry while later questions use the new choice; inspect desktop/narrow layouts.
+10. Select GPT-5.6 Sol for a review and GPT-5.5 for a reply; remember selection across reloads; preserve review/reply model labels; keep a failed reply's original model on retry while later questions use the new choice; inspect desktop/narrow layouts.
 11. Recover a legacy plain-UUID pending review without changing its recorded model or creating a second call.
 
 Annotation scenarios in [quality.spec.ts](../tests/browser/quality.spec.ts):
@@ -78,7 +78,7 @@ Earlier live checks verified an OpenAI review and two follow-up replies on a syn
 - Restart tests cover application recovery and saved data; they do not establish durability under arbitrary OS kills, hardware faults, or prolonged storage outages.
 - There is no multi-worker/load test, tool-execution safety evaluation, distributed trace backend, or production deployment verification.
 - The original fresh-clone verification at `6aa8794` installed from lockfiles and checked production startup/restart on macOS arm64 (Node 25.6.1, npm 11.9.0, uv 0.11.7, Python 3.12.13). It covered the then-current 56-test version; it was not repeated as a fresh install for every later commit or on all minimum supported versions.
-- Later milestones added evaluations/tracing (63 backend tests), annotation (69 then 72), independent conversations (77 and 20 browser cases), the three review repairs (82 and 26), and model selection (88 and 30). Git history retains the detailed development records. The current suite emits one upstream Starlette/httpx deprecation warning.
+- Later milestones added evaluations/tracing (63 backend tests), annotation (69 then 72), independent conversations (77 and 20 browser cases), the three review repairs (82 and 26), model selection (88 and 30), and GPT-5.5/GPT-5.6 Sol compatibility (90 and 30). Git history retains the detailed development records. The current suite emits one upstream Starlette/httpx deprecation warning.
 
 ## Short demo
 

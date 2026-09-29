@@ -56,11 +56,13 @@ Install Chromium once with `npx playwright install chromium`. E2E tests use a te
 
 ## Model selection
 
-The app default remains **GPT-4.1 mini** (`OPENAI_MODEL`). **Model for next review** and **Model for next reply** offer GPT-4.1 mini, GPT-4.1, and GPT-4.1 nano. A configured OpenAI model/snapshot is also included as the app default. Choices come from a server-owned catalog; they are not a live list of models enabled for your API account.
+The app default remains **GPT-4.1 mini** (`OPENAI_MODEL`). **Model for next review** and **Model for next reply** offer GPT-5.6 Sol, GPT-5.5, GPT-4.1 mini, GPT-4.1, and GPT-4.1 nano. A configured OpenAI model/snapshot is also included as the app default. Choices come from a server-owned catalog; they are not a live list of models enabled for your API account.
 
 Selecting a model remembers it as the default for new requests in this browser. Each queued review/reply stores its model and uses a dedicated adapter configuration, so simultaneous requests cannot overwrite each other's model. Historical results display their recorded model. Lost-response recovery and reply retries retain the original model; a new review/question can use a different one. Older results without trace evidence display an unknown model rather than guessing.
 
-All choices use the server's OpenAI key. Model access, cost, and behavior depend on the account/model; a rejected call produces an explicit failure, with no silent fallback. The existing quality measurements apply only to GPT-4.1 mini. Official compatibility references: [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1), [GPT-4.1 nano](https://developers.openai.com/api/docs/models/gpt-4.1-nano).
+GPT-5.5 and GPT-5.6 Sol explicitly use `reasoning.effort=none` as the latency baseline, with the existing output caps (5,000 tokens for reviews; 1,500 for replies). Compare reasoning-enabled configurations on the eval dataset before changing this policy. Other operator-configured models retain provider defaults.
+
+All choices use the server's OpenAI key. Model access, cost, and behavior depend on the account/model; a rejected call produces an explicit failure, with no silent fallback. The existing quality measurements apply only to GPT-4.1 mini. Official OpenAI compatibility references: [GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5), [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1), [GPT-4.1 nano](https://developers.openai.com/api/docs/models/gpt-4.1-nano).
 
 ## Architecture
 
@@ -103,7 +105,7 @@ Read the concise [design](docs/design.md) and [API/data reference](docs/data-con
 
 ## Tests, evaluation, and observability
 
-Latest software verification: **88 backend tests and 30 Chromium browser cases** (15 scenarios at desktop and narrow widths), plus TypeScript and production build. Coverage includes persistence, filters, review/finding lifecycle, conversation isolation, retries, lost responses, database constraints/migrations, human annotations/export, tracing, and grading. The complete [test inventory and verification limits](docs/verification.md) distinguish automated checks, manual acceptance, and earlier live-provider checks. Tests use temporary databases and mocked providers, without API cost.
+Latest software verification: **90 backend tests and 30 Chromium browser cases** (15 scenarios at desktop and narrow widths), plus TypeScript and production build. Coverage includes persistence, filters, review/finding lifecycle, conversation isolation, retries, lost responses, database constraints/migrations, human annotations/export, tracing, and grading. The complete [test inventory and verification limits](docs/verification.md) distinguish automated checks, manual acceptance, and earlier live-provider checks. Tests use temporary databases and mocked providers, without API cost.
 
 Model quality is evaluated separately: ten synthetic development cases, versioned prompts, saved results, and a human annotation/export workflow. These cases were used for tuning; they are not an independent accuracy benchmark. The selected prompt still has a documented SQL false positive. See the [quality guide](docs/quality.md).
 

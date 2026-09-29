@@ -4,6 +4,7 @@ from typing import Protocol
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, AuthenticationError, RateLimitError
 
 from .config import Settings
+from .models import response_options
 from .tracing import record_response, traced
 from .contracts import DiscussionTurn, Finding, Snippet
 
@@ -60,6 +61,7 @@ class OpenAIDiscussionProvider:
             ) as client:
                 response = await client.responses.create(
                     model=self.settings.openai_model, input=messages, max_output_tokens=1500, store=False,
+                    **response_options(self.settings.openai_model),
                 )
             record_response(response)
             if response.status != "completed":

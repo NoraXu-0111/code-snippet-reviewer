@@ -2,6 +2,8 @@
 from .contracts import ModelCatalog, ModelOption
 
 OPENAI_MODELS = {
+    "gpt-5.6-sol": "GPT-5.6 Sol",
+    "gpt-5.5": "GPT-5.5",
     "gpt-4.1-mini": "GPT-4.1 mini",
     "gpt-4.1": "GPT-4.1",
     "gpt-4.1-nano": "GPT-4.1 nano",
@@ -24,3 +26,11 @@ def select_model(requested: str | None, default: str, providers: dict) -> str:
     if selected not in providers:
         raise InvalidModel("Choose an OpenAI model from the available list.")
     return selected
+
+
+def response_options(model: str) -> dict:
+    # Keep the existing non-reasoning latency/token baseline for these options.
+    # Other operator-configured models retain their own provider defaults.
+    if model in {"gpt-5.5", "gpt-5.6-sol"}:
+        return {"reasoning": {"effort": "none"}}
+    return {}

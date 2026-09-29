@@ -8,6 +8,7 @@ from openai import (
 from pydantic import ValidationError
 
 from .config import Settings
+from .models import response_options
 from .tracing import record_response, traced
 from .contracts import ReviewOutput, Snippet, parse_review_output
 
@@ -78,6 +79,7 @@ class OpenAIReviewer:
                     text_format=ReviewOutput,
                     max_output_tokens=5000,
                     store=False,
+                    **response_options(self.settings.openai_model),
                 )
             record_response(response)
             if response.status != "completed":

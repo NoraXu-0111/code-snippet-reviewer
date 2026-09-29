@@ -395,23 +395,23 @@ test("model preference persists while historical reviews and reply retries retai
     exact: true,
   });
   await expect(picker).toHaveValue("gpt-4.1-mini");
-  await picker.selectOption("gpt-4.1");
+  await picker.selectOption("gpt-5.6-sol");
   await page.reload();
-  await expect(picker).toHaveValue("gpt-4.1");
+  await expect(picker).toHaveValue("gpt-5.6-sol");
   await review(page);
   await expect(
-    page.getByText("Review model: gpt-4.1", { exact: true }),
+    page.getByText("Review model: gpt-5.6-sol", { exact: true }),
   ).toBeVisible();
-  await picker.selectOption("gpt-4.1-nano");
+  await picker.selectOption("gpt-5.5");
   await expect(
-    page.getByText("Review model: gpt-4.1", { exact: true }),
+    page.getByText("Review model: gpt-5.6-sol", { exact: true }),
   ).toBeVisible();
   await discuss(page);
   const replyPicker = page.getByRole("combobox", {
     name: "Model for next reply",
     exact: true,
   });
-  await expect(replyPicker).toHaveValue("gpt-4.1-nano");
+  await expect(replyPicker).toHaveValue("gpt-5.5");
   await page.getByLabel("Ask a follow-up", { exact: true }).fill("fail once");
   await page
     .getByRole("button", { name: "Send question", exact: true })
@@ -425,7 +425,7 @@ test("model preference persists while historical reviews and reply retries retai
     page.getByText("Answer with 0 earlier exchanges.", { exact: false }),
   ).toBeVisible();
   await expect(page.locator(".chat-assistant .chat-author")).toHaveText([
-    "AI · gpt-4.1-nano",
+    "AI · gpt-5.5",
   ]);
   await page
     .getByLabel("Ask a follow-up", { exact: true })
@@ -440,11 +440,11 @@ test("model preference persists while historical reviews and reply retries retai
   await discuss(page);
   await expect(replyPicker).toHaveValue("gpt-4.1-mini");
   await expect(page.locator(".chat-assistant .chat-author")).toHaveText([
-    "AI · gpt-4.1-nano",
+    "AI · gpt-5.5",
     "AI · gpt-4.1-mini",
   ]);
   await expect(
-    page.getByText("Review model: gpt-4.1", { exact: true }),
+    page.getByText("Review model: gpt-5.6-sol", { exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(

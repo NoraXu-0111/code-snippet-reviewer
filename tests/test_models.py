@@ -20,15 +20,27 @@ def fake_sdk(monkeypatch):
     calls = []
     control = {'fail_reply': False}
 
+    def check_options(kwargs):
+        if kwargs['model'] in {'gpt-5.5', 'gpt-5.6-sol'}:
+            assert kwargs['reasoning'] == {'effort': 'none'}
+        else:
+            assert 'reasoning' not in kwargs
+        assert kwargs['store'] is False
+
     class Client:
         def __init__(self, **kwargs): self.responses = self
         async def __aenter__(self): return self
         async def __aexit__(self, *args): pass
         async def parse(self, **kwargs):
+            check_options(kwargs)
+            assert kwargs['text_format'] is ReviewOutput
+            assert kwargs['max_output_tokens'] == 5000
             calls.append(('review', kwargs['model']))
             await asyncio.sleep(.02)
             return SimpleNamespace(status='completed', output=[], output_parsed=ReviewOutput.model_validate({'findings': [FINDING]}))
         async def create(self, **kwargs):
+            check_options(kwargs)
+            assert kwargs['max_output_tokens'] == 1500
             calls.append(('discussion', kwargs['model']))
             if control['fail_reply']:
                 control['fail_reply'] = False
@@ -47,18 +59,23 @@ def test_catalog_and_configured_default(tmp_path, default):
         catalog = client.get('/api/models').json()
         assert set(catalog) == {'provider', 'defaultModel', 'models'}
         assert catalog['provider'] == 'openai' and catalog['defaultModel'] == default
-        assert {'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', default} <= {item['id'] for item in catalog['models']}
+        assert {'gpt-5.5', 'gpt-5.6-sol', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', default} <= {item['id'] for item in catalog['models']}
         snippet = create(client)
         run = client.post(f'/api/snippets/{snippet}/reviews', json={'clientRequestId': str(uuid4())}).json()
         assert finish(client, run['id'])['review']['model'] == default
 
 
-def test_selected_models_reach_adapters_history_and_traces_without_cross_talk(tmp_path, monkeypatch):
+@pytest.mark.parametrize('models', [
+    ('gpt-4.1', 'gpt-4.1-nano'),
+    ('gpt-5.5', 'gpt-5.6-sol'),
+    ('gpt-5.6-sol', 'gpt-5.5'),
+])
+def test_selected_models_reach_adapters_history_and_traces_without_cross_talk(tmp_path, monkeypatch, models):
     calls, _ = fake_sdk(monkeypatch)
     settings = Settings(database_path=tmp_path/'test.db', openai_api_key='synthetic-test-key')
     with TestClient(create_app(settings)) as client:
         runs = []
-        for model in ('gpt-4.1', 'gpt-4.1-nano'):
+        for model in models:
             snippet = create(client)
             payload = {'clientRequestId': str(uuid4()), 'model': model}
             url = f'/api/snippets/{snippet}/reviews'
@@ -75,16 +92,16 @@ def test_selected_models_reach_adapters_history_and_traces_without_cross_talk(tm
             assert client.post(url, json={**payload, 'model': 'gpt-4.1-mini'}).status_code == 409
         finding = result['findings'][0]['id']
         url = f'/api/findings/{finding}/discussion'
-        payload = {'clientRequestId': str(uuid4()), 'message': 'Explain', 'model': 'gpt-4.1'}
+        payload = {'clientRequestId': str(uuid4()), 'message': 'Explain', 'model': models[0]}
         assert client.post(url, json=payload).status_code == 202
         turn = settled(client, finding)[0]
-        assert turn['model'] == 'gpt-4.1' and turn['assistantMessage'] == 'Answer from gpt-4.1'
+        assert turn['model'] == models[0] and turn['assistantMessage'] == 'Answer from ' + models[0]
         assert client.post(url, json=payload).status_code == 200
-        assert client.post(url, json={**payload, 'model': 'gpt-4.1-nano'}).status_code == 409
-    assert sorted(calls) == sorted([('review', 'gpt-4.1'), ('review', 'gpt-4.1-nano'), ('discussion', 'gpt-4.1')])
+        assert client.post(url, json={**payload, 'model': models[1]}).status_code == 409
+    assert sorted(calls) == sorted([('review', models[0]), ('review', models[1]), ('discussion', models[0])])
     with closing(open_database(settings.database_path)) as db:
         spans = db.execute('SELECT subject_id, model FROM model_calls').fetchall()
-        assert {(row['subject_id'], row['model']) for row in spans} == {(id, model) for _, id, model, _ in runs} | {(turn['id'], 'gpt-4.1')}
+        assert {(row['subject_id'], row['model']) for row in spans} == {(id, model) for _, id, model, _ in runs} | {(turn['id'], models[0])}
     assert settings.openai_model == 'gpt-4.1-mini'
 
 
