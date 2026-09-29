@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040" role="img" aria-labelledby="title desc">
+<title id="title">Data model and API contract</title><desc id="desc">Core product entities, one-to-many ownership, persisted finding resolutions, and HTTP methods, paths, request fields, and responses. Evaluation and trace tables are separate supporting systems.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#356f59"/></marker></defs>
+<rect width="1600" height="1040" fill="#f7f8f4"/>
+<g font-family="Arial, Helvetica, sans-serif">
+<text x="60" y="52" font-size="17" fill="#356f59" font-weight="700">CODE SNIPPET REVIEWER  /  03</text>
+<text x="60" y="105" font-size="43" fill="#20352e" font-weight="700">Data model + API contract</text>
+<text x="60" y="144" font-size="22" fill="#586a62" font-weight="400">Core product · UUID identifiers · camelCase JSON · UTC timestamps · SQLite persistence</text>
+<rect x="60" y="194" width="280" height="237" rx="16" fill="white" stroke="#d5dfd7" stroke-width="1.5"/>
+<text x="75" y="226" font-size="20" fill="#20352e" font-weight="700" data-max-width="250">Snippet</text>
+<text x="75" y="261" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">id  [PK]</text>
+<text x="75" y="289" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">title, language</text>
+<text x="75" y="317" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">code (immutable)</text>
+<text x="75" y="345" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">createdAt</text>
+<path d="M340 183 H360" fill="none" stroke="#356f59" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="270" y="179" font-size="15" fill="#356f59" font-weight="400" data-max-width="85">1 → many</text>
+<rect x="360" y="194" width="280" height="237" rx="16" fill="white" stroke="#d5dfd7" stroke-width="1.5"/>
+<text x="375" y="226" font-size="20" fill="#20352e" font-weight="700" data-max-width="250">ReviewRun</text>
+<text x="375" y="261" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">id  [PK]</text>
+<text x="375" y="289" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">snippetId  [FK]</text>
+<text x="375" y="317" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">model, status</text>
+<text x="375" y="345" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">createdAt, startedAt</text>
+<text x="375" y="373" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">finishedAt, error</text>
+<path d="M640 183 H660" fill="none" stroke="#356f59" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="570" y="179" font-size="15" fill="#356f59" font-weight="400" data-max-width="85">1 → many</text>
+<rect x="660" y="194" width="280" height="237" rx="16" fill="#e9f0e8" stroke="#d5dfd7" stroke-width="1.5"/>
+<text x="675" y="226" font-size="20" fill="#20352e" font-weight="700" data-max-width="250">Finding</text>
+<text x="675" y="261" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">id  [PK]</text>
+<text x="675" y="289" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">reviewRunId  [FK]</text>
+<text x="675" y="317" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">startLine, endLine</text>
+<text x="675" y="345" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">severity, category</text>
+<text x="675" y="373" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">description, suggestedFix</text>
+<text x="675" y="401" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">resolution</text>
+<path d="M940 183 H960" fill="none" stroke="#356f59" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="870" y="179" font-size="15" fill="#356f59" font-weight="400" data-max-width="85">1 → many</text>
+<rect x="960" y="194" width="280" height="237" rx="16" fill="white" stroke="#d5dfd7" stroke-width="1.5"/>
+<text x="975" y="226" font-size="19" fill="#20352e" font-weight="700" data-max-width="250">DiscussionConversation</text>
+<text x="975" y="261" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">id  [PK]</text>
+<text x="975" y="289" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">findingId  [FK]</text>
+<text x="975" y="317" font-size="18" fill="#586a62" font-weight="400" data-max-width="250">createdAt</text>
+<path d="M1240 183 H1260" fill="none" stroke="#356f59" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="1170" y="179" font-size="15" fill="#356f59" font-weight="400" data-max-width="85">1 → many</text>
+<rect x="1260" y="194" width="280" height="237" rx="16" fill="white" stroke="#d5dfd7" stroke-width="1.5"/>
+<text x="1275" y="226" font-size="20" fill="#20352e" font-weight="700" data-max-width="250">DiscussionTurn</text>
+<text x="1275" y="261" font-size="16" fill="#586a62" font-weight="400" data-max-width="250">id  [PK]</text>
+<text x="1275" y="289" font-size="16" fill="#586a62" font-weight="400" data-max-width="250">conversationId, findingId  [FK]</text>
+<text x="1275" y="317" font-size="16" fill="#586a62" font-weight="400" data-max-width="250">clientRequestId, attempt</text>
+<text x="1275" y="345" font-size="16" fill="#586a62" font-weight="400" data-max-width="250">userMessage, assistantMessage</text>
+<text x="1275" y="373" font-size="16" fill="#586a62" font-weight="400" data-max-width="250">model, status, error</text>
+<text x="1275" y="401" font-size="16" fill="#586a62" font-weight="400" data-max-width="250">createdAt, startedAt, finishedAt</text>
+<text x="60" y="468" font-size="19" fill="#586a62" font-weight="400">Execution status: queued → running → succeeded / failed</text>
+<text x="840" y="468" font-size="19" fill="#356f59" font-weight="700">Finding resolution: open / accepted / dismissed</text>
+<text x="60" y="500" font-size="18" fill="#586a62" font-weight="400">Review and finding states are independent. Each turn belongs to one conversation and its owning finding.</text>
+<text x="60" y="548" font-size="17" fill="#356f59" font-weight="700">HTTP API</text>
+<text x="207" y="548" font-size="18" fill="#586a62" font-weight="400">Base path: /api   ·   :id = the resource UUID   ·   ? = optional body field</text>
+<text x="60" y="583" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">POST /snippets</text>
+<text x="60" y="610" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">{title, language, code} → 201 Snippet</text>
+<path d="M60 622 H760" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="60" y="644" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">GET /snippets</text>
+<text x="60" y="671" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">Query: language, reviewStatus → {snippets, languages}</text>
+<path d="M60 683 H760" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="60" y="705" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">GET /snippets/:id</text>
+<text x="60" y="732" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">→ {snippet, latestReview}</text>
+<path d="M60 744 H760" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="60" y="766" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">POST /snippets/:id/reviews</text>
+<text x="60" y="793" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">{clientRequestId, model?} → 202 ReviewRun; 200 replay</text>
+<path d="M60 805 H760" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="60" y="827" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">GET /snippets/:id/reviews</text>
+<text x="60" y="854" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">→ {reviews} · newest first</text>
+<path d="M60 866 H760" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="60" y="888" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">GET /reviews/:id</text>
+<text x="60" y="915" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">→ {review, findings} · poll this for async completion</text>
+<text x="840" y="583" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">PATCH /findings/:id</text>
+<text x="840" y="610" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">{resolution} → Finding · persisted, idempotent update</text>
+<path d="M840 622 H1540" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="840" y="644" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">POST /findings/:id/conversations</text>
+<text x="840" y="671" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">{clientRequestId} → 201 Conversation; 200 replay</text>
+<path d="M840 683 H1540" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="840" y="705" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">GET /findings/:id/discussion</text>
+<text x="840" y="732" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">Query: conversationId → {conversationId, conversations, hasActiveReply, turns}</text>
+<path d="M840 744 H1540" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="840" y="766" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">POST /findings/:id/discussion</text>
+<text x="840" y="793" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">{message, clientRequestId, conversationId?, model?} → 202 Turn; 200 replay</text>
+<path d="M840 805 H1540" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="840" y="827" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">POST /discussion-turns/:id/retry</text>
+<text x="840" y="854" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">{attempt} → 202 Turn · same model, incremented attempt</text>
+<path d="M840 866 H1540" fill="none" stroke="#d5dfd7" stroke-width="2"/>
+<text x="840" y="888" font-size="21" fill="#20352e" font-weight="700" data-max-width="700">GET /models   ·   GET /health</text>
+<text x="840" y="915" font-size="18" fill="#586a62" font-weight="400" data-max-width="700">→ {provider, defaultModel, models}   ·   → {status, database}</text>
+<rect x="60" y="934" width="1480" height="68" rx="12" fill="#e9f0e8" stroke="#d5dfd7" stroke-width="1.5"/>
+<text x="80" y="962" font-size="18" fill="#20352e" font-weight="400" data-max-width="1440">Errors: {error: {code, message}} · 400 invalid · 404 missing · 409 conflict · 503 unconfigured · 500 unexpected</text>
+<text x="80" y="989" font-size="17" fill="#586a62" font-weight="400" data-max-width="1440">Async model failures are saved on the run / turn. Full schema: /openapi.json; evaluation APIs: /api/quality/*.</text>
+</g></svg>

@@ -95,6 +95,12 @@ Review and discussion services persist a queued job before scheduling model work
 
 In development, Vite serves the frontend and proxies `/api` to FastAPI. With `npm start`, FastAPI also serves the built frontend. The browser never calls OpenAI directly.
 
+## Data model and API
+
+![Core data model and API contract: entity relationships, request fields, responses, and error codes](docs/images/data-model-api.png)
+
+[Full-size image](docs/images/data-model-api.png) · [Editable SVG](docs/images/data-model-api.svg) · [Detailed API/data reference](docs/data-contract.md). The diagram summarizes the core product; evaluation and tracing are documented separately. FastAPI exposes the complete schema at `/openapi.json`.
+
 ## Design and limits
 
 FastAPI/Pydantic owns the contracts; generated TypeScript types keep the React client aligned. SQLite stores domain records and transactional migrations. In-process asynchronous jobs share two provider slots, with one active review per snippet and one active reply per finding. Timeout includes queue wait. Restart marks interrupted work failed for explicit retry; this is not a durable multi-worker job system or an exactly-once provider guarantee.
