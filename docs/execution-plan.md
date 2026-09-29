@@ -20,7 +20,7 @@ Final verification and a short demo are recorded in [verification.md](verificati
 9. **Reading and demo experience (completed):** wider discussion workspace, persisted drafts on close, keyboard focus restoration, responsive layout, safe sample-code entry points.
 10. **Review history (completed):** scoped list API and URL-persisted selector, preserving earlier findings, resolutions and conversations.
 11. **Quality evaluation and local tracing (completed):** versioned fixed fixtures/prompts, opt-in live runner, transparent candidate grading, saved results and rubric, safe model-call metadata.
-12. **Repeatable browser regression (completed):** initially five workflows; now 13 scenarios at desktop and narrow widths (26 cases), isolated SQLite and deterministic providers, failure screenshots/action traces.
+12. **Repeatable browser regression (completed):** initially five workflows; now 15 scenarios at desktop and narrow widths (30 cases), isolated SQLite and deterministic providers, failure screenshots/action traces.
 
 13. **Human annotation workflow (completed):** staged independent inspection/reference validation/output assessment, frozen evaluation evidence, persisted drafts and revision conflicts, progress and full JSON export; selectable judgments/reasons with optional notes following user feedback. No automatic promotion to gold labels or new provider calls.
 
@@ -32,3 +32,6 @@ These improvements were explicitly requested after the original MVP. They are ad
 15. **Independent review repairs (completed):** protect newer annotation drafts from delayed saves, recover review submissions by persisted client UUID, and read review status/findings from one database snapshot. Covered by 82 backend tests and 26 browser cases.
 
 Current architecture is summarized in [design.md](design.md). [roadmap.md](roadmap.md) prioritizes future extensions; those proposals are not completed milestones. User manual acceptance covers the main product flows, offline recovery, and restart persistence. The final manual annotation/export walkthrough was deferred; automated annotation coverage passed.
+
+
+16. **OpenAI model selection (completed):** server catalog and configurable app default, remembered browser preference, review/reply selectors, persisted model identity, model-aware replay/retry, dedicated adapter settings, and history/trace labels. Legacy models remain unknown unless backed by trace evidence. Mocked integration and browser tests cover the selection paths; no new live model-quality claims are made.

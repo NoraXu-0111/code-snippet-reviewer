@@ -29,7 +29,7 @@ def insert_snippet(db):
 
 def insert_run(db, snippet_id):
     run_id = str(uuid4())
-    db.execute("INSERT INTO review_runs VALUES (?, ?, ?, ?, ?, ?, ?)", (run_id, snippet_id, "queued", NOW, None, None, None))
+    db.execute("INSERT INTO review_runs (id, snippet_id, status, created_at, started_at, finished_at, error) VALUES (?, ?, ?, ?, ?, ?, ?)", (run_id, snippet_id, "queued", NOW, None, None, None))
     return run_id
 
 
@@ -47,7 +47,7 @@ def test_persistence_and_idempotent_migration(tmp_path):
     db = open_database(filename)
     try:
         assert db.execute("SELECT resolution FROM findings WHERE id = ?", (finding_id,)).fetchone()[0] == "accepted"
-        assert db.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 6
+        assert db.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 7
         assert db.execute("SELECT code FROM snippets WHERE id = ?", (snippet_id,)).fetchone()[0] == "print(1)"
     finally:
         db.close()

@@ -21,7 +21,7 @@ def workspace(tmp_path):
         now = "2026-09-28T00:00:00Z"
         with closing(open_database(settings.database_path)) as db:
             for run_id in run_ids:
-                db.execute("INSERT INTO review_runs VALUES (?, ?, 'succeeded', ?, ?, ?, NULL)", (run_id, snippet["id"], now, now, now))
+                db.execute("INSERT INTO review_runs (id, snippet_id, status, created_at, started_at, finished_at, error) VALUES (?, ?, 'succeeded', ?, ?, ?, NULL)", (run_id, snippet["id"], now, now, now))
             for index, finding_id in enumerate(finding_ids):
                 db.execute("INSERT INTO findings VALUES (?, ?, 1, 2, 'info', 'style', ?, NULL, 'open')",
                            (finding_id, run_ids[0 if index < 2 else 1], f"Finding {index}"))

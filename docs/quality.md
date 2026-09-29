@@ -29,6 +29,8 @@ Results include configured model, prompt version/hash, dataset hash, base Git re
 
 The deterministic grader requires category agreement, source-range overlap, and an issue-specific cue. Each finding can match at most one expected issue. Remaining findings are candidates for false positives or duplicates; unmatched expected issues are candidates for misses. Broad line ranges may pass overlap even when imprecise, and keyword matches may be semantically wrong. Severity agreement is measured separately. Negative cases pass only with a successful empty response; failed calls do not count as correct silence. Failed positive attempts remain in the recall denominator. Precision is null when no findings were returned.
 
+The interactive app's browser model selection does not affect the eval CLI, which uses the server-side `OPENAI_MODEL` configuration. Compare models in separate output directories and retain their recorded model/prompt/dataset metadata. The new selectable models have deterministic integration coverage, but no new live quality comparison has been run for this feature.
+
 ## Observed results — September 28, 2026
 
 Same model (`gpt-4.1-mini`) and fixed dataset throughout. These are development-set measurements, with unequal baseline/candidate repeat counts. They are not a held-out estimate, statistical significance claim, or production accuracy percentage.

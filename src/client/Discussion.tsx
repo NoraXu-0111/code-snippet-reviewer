@@ -11,7 +11,13 @@ import {
 import type { components } from "../shared/api-types";
 type ConversationRecord = components["schemas"]["DiscussionConversation"];
 
-type Submission = { message: string; clientRequestId: string };
+import { ModelPicker, useModelChoice } from "./ModelPicker";
+
+type Submission = {
+  message: string;
+  clientRequestId: string;
+  model?: string | null;
+};
 const isActive = (turn: DiscussionTurn) =>
   turn.status === "queued" || turn.status === "running";
 
@@ -206,6 +212,7 @@ function Conversation({
   onBusyChange: (busy: boolean) => void;
   locked: boolean;
 }) {
+  const choice = useModelChoice();
   // Keep original keys for old drafts and pending submissions after the migration.
   const scope =
     conversationId === findingId ? findingId : `${findingId}:${conversationId}`;
@@ -273,7 +280,11 @@ function Conversation({
   }, [data, pending]);
 
   async function send() {
-    if (locked || inFlight.current || (!pending && (active || !message.trim())))
+    if (
+      locked ||
+      inFlight.current ||
+      (!pending && (active || !message.trim() || !choice.model))
+    )
       return;
     inFlight.current = true;
     setBusy(true);
@@ -282,6 +293,7 @@ function Conversation({
     const submission = pending ?? {
       message,
       clientRequestId: crypto.randomUUID(),
+      model: choice.model,
     };
     remember(submission);
     try {
@@ -377,7 +389,9 @@ function Conversation({
               <p>{turn.userMessage}</p>
             </div>
             <div className="chat-message chat-assistant">
-              <span className="chat-author">AI</span>
+              <span className="chat-author">
+                AI · {turn.model ?? "Model not recorded"}
+              </span>
               {turn.status === "succeeded" && <p>{turn.assistantMessage}</p>}
               {isActive(turn) && (
                 <p role="status">
@@ -439,6 +453,12 @@ function Conversation({
           void send();
         }}
       >
+        <ModelPicker
+          choice={choice}
+          label="Model for next reply"
+          disabled={locked || busy || active || !!pending}
+          frozenModel={pending?.model}
+        />
         <label htmlFor={`question-${findingId}`}>Ask a follow-up</label>
         <textarea
           id={`question-${findingId}`}
@@ -468,6 +488,7 @@ function Conversation({
               active ||
               !!pending ||
               !data ||
+              !choice.model ||
               !message.trim() ||
               Array.from(message).length > 4000
             }

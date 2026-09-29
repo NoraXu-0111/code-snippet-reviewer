@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  "/api/models": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Models */
+    get: operations["models_api_models_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/health": {
     parameters: {
       query?: never;
@@ -355,6 +372,8 @@ export interface components {
     };
     /** CreateDiscussionTurn */
     CreateDiscussionTurn: {
+      /** Model */
+      model?: string | null;
       /** Conversationid */
       conversationId?: string | null;
       /** Message */
@@ -372,6 +391,8 @@ export interface components {
        * Format: uuid
        */
       clientRequestId: string;
+      /** Model */
+      model?: string | null;
     };
     /** CreateSnippet */
     CreateSnippet: {
@@ -428,6 +449,8 @@ export interface components {
       finishedAt?: string | null;
       /** Error */
       error?: string | null;
+      /** Model */
+      model?: string | null;
       /**
        * Conversationid
        * Format: uuid
@@ -574,6 +597,26 @@ export interface components {
        */
       database: "connected";
     };
+    /** ModelCatalog */
+    ModelCatalog: {
+      /**
+       * Provider
+       * @default openai
+       * @constant
+       */
+      provider: "openai";
+      /** Defaultmodel */
+      defaultModel: string;
+      /** Models */
+      models: components["schemas"]["ModelOption"][];
+    };
+    /** ModelOption */
+    ModelOption: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+    };
     /** NewSession */
     NewSession: {
       /** Sourceid */
@@ -649,6 +692,8 @@ export interface components {
       finishedAt?: string | null;
       /** Error */
       error?: string | null;
+      /** Model */
+      model?: string | null;
       /**
        * Id
        * Format: uuid
@@ -867,6 +912,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  models_api_models_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ModelCatalog"];
+        };
+      };
+    };
+  };
   health_api_health_get: {
     parameters: {
       query?: never;

@@ -177,9 +177,9 @@ def test_context_recent_ten_ordering_and_foreign_finding_exclusion(tmp_path):
         with closing(open_database(settings.database_path)) as db:
             ensure_default_conversation(db, finding)
             for i in range(12):
-                db.execute("""INSERT INTO discussion_turns VALUES (?, ?, ?, ?, ?, ?, 'succeeded', 1, ?, ?, ?, NULL)""",
+                db.execute("""INSERT INTO discussion_turns (id, finding_id, conversation_id, client_request_id, user_message, assistant_message, status, attempt, created_at, started_at, finished_at, error) VALUES (?, ?, ?, ?, ?, ?, 'succeeded', 1, ?, ?, ?, NULL)""",
                            (str(uuid4()), finding, finding, str(uuid4()), f"q{i}", f"a{i}", *(["2020-01-01T00:00:00Z"] * 3)))
-            db.execute("INSERT INTO discussion_turns VALUES (?, ?, ?, ?, 'FAILED', NULL, 'failed', 1, ?, NULL, ?, 'Failure')",
+            db.execute("INSERT INTO discussion_turns (id, finding_id, conversation_id, client_request_id, user_message, assistant_message, status, attempt, created_at, started_at, finished_at, error) VALUES (?, ?, ?, ?, 'FAILED', NULL, 'failed', 1, ?, NULL, ?, 'Failure')",
                        (str(uuid4()), finding, finding, str(uuid4()), *(["2020-01-01T00:00:00Z"] * 2)))
         ask(client, other, "PRIVATE_OTHER_FINDING")
         settled(client, other)

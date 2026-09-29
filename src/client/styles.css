@@ -1116,3 +1116,15 @@ button.finding-lines[aria-pressed="true"] {
 .conversation-workspace > .muted {
   margin-bottom: 10px;
 }
+
+.model-picker {
+  margin: 14px 0;
+  min-width: 0;
+}
+.model-picker select {
+  width: 100%;
+  min-width: 0;
+}
+.model-picker .small {
+  margin: 6px 0 0;
+}

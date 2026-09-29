@@ -54,6 +54,14 @@ Install Chromium once with `npx playwright install chromium`. E2E tests use a te
 4. **Discuss with AI** supports follow-up questions. **New conversation** starts a separate history for the same finding; **Conversation** switches histories. Each reply receives the snippet, finding, and up to ten successful exchanges from that conversation.
 5. A lost review response offers **Check submission**, reusing the same persisted request UUID even after completion or same-tab reload. **Run new review** / **Retry review** starts a deliberately new run after confirmation. Clearing browser storage removes the recovery identity. Discussion and conversation creation also support submission recovery.
 
+## Model selection
+
+The app default remains **GPT-4.1 mini** (`OPENAI_MODEL`). **Model for next review** and **Model for next reply** offer GPT-4.1 mini, GPT-4.1, and GPT-4.1 nano. A configured OpenAI model/snapshot is also included as the app default. Choices come from a server-owned catalog; they are not a live list of models enabled for your API account.
+
+Selecting a model remembers it as the default for new requests in this browser. Each queued review/reply stores its model and uses a dedicated adapter configuration, so simultaneous requests cannot overwrite each other's model. Historical results display their recorded model. Lost-response recovery and reply retries retain the original model; a new review/question can use a different one. Older results without trace evidence display an unknown model rather than guessing.
+
+All choices use the server's OpenAI key. Model access, cost, and behavior depend on the account/model; a rejected call produces an explicit failure, with no silent fallback. The existing quality measurements apply only to GPT-4.1 mini. Official compatibility references: [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1), [GPT-4.1 nano](https://developers.openai.com/api/docs/models/gpt-4.1-nano).
+
 ## Architecture
 
 ```mermaid
@@ -95,7 +103,7 @@ Read the concise [design](docs/design.md) and [API/data reference](docs/data-con
 
 ## Tests, evaluation, and observability
 
-Latest software verification: **82 backend tests and 26 Chromium browser cases** (13 scenarios at desktop and narrow widths), plus TypeScript and production build. Coverage includes persistence, filters, review/finding lifecycle, conversation isolation, retries, lost responses, database constraints/migrations, human annotations/export, tracing, and grading. The complete [test inventory and verification limits](docs/verification.md) distinguish automated checks, manual acceptance, and earlier live-provider checks. Tests use temporary databases and mocked providers, without API cost.
+Latest software verification: **88 backend tests and 30 Chromium browser cases** (15 scenarios at desktop and narrow widths), plus TypeScript and production build. Coverage includes persistence, filters, review/finding lifecycle, conversation isolation, retries, lost responses, database constraints/migrations, human annotations/export, tracing, and grading. The complete [test inventory and verification limits](docs/verification.md) distinguish automated checks, manual acceptance, and earlier live-provider checks. Tests use temporary databases and mocked providers, without API cost.
 
 Model quality is evaluated separately: ten synthetic development cases, versioned prompts, saved results, and a human annotation/export workflow. These cases were used for tuning; they are not an independent accuracy benchmark. The selected prompt still has a documented SQL false positive. See the [quality guide](docs/quality.md).
 

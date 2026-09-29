@@ -11,6 +11,7 @@ from .database import open_database
 from .reviewer import Reviewer, ReviewFailure
 from .snippets import get_snippet
 from .tracing import trace_subject
+from .models import select_model
 
 
 def now() -> str:
@@ -47,10 +48,12 @@ def get_review(db: sqlite3.Connection, review_id: UUID | str) -> ReviewDetail | 
 class ReviewService:
     """Single-process local runner. SQLite records survive; tasks do not."""
 
-    def __init__(self, path: Path, reviewer: Reviewer, timeout: float, slots: asyncio.Semaphore | None = None, *, configured: bool = True):
+    def __init__(self, path: Path, reviewer: Reviewer, timeout: float, slots: asyncio.Semaphore | None = None, *, configured: bool = True, default_model: str = "gpt-4.1-mini", providers: dict[str, Reviewer] | None = None):
         self.configured = configured
         self.path = path
         self.reviewer = reviewer
+        self.default_model = default_model
+        self.providers = providers if providers is not None else {default_model: reviewer}
         self.timeout = timeout
         self.tasks: set[asyncio.Task] = set()
         self.slots = slots if slots is not None else asyncio.Semaphore(2)
@@ -62,7 +65,7 @@ class ReviewService:
                 (now(), "Review interrupted by a server restart. Please retry."),
             )
 
-    def submit(self, snippet_id: UUID, client_request_id: UUID) -> tuple[ReviewRun, bool]:
+    def submit(self, snippet_id: UUID, client_request_id: UUID, model: str | None = None) -> tuple[ReviewRun, bool]:
         with closing(open_database(self.path, migrate=False)) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -72,6 +75,8 @@ class ReviewService:
                     WHERE s.snippet_id = ? AND s.client_request_id = ?""",
                     (str(snippet_id), str(client_request_id))).fetchone()
                 if previous is not None:
+                    if model is not None and previous["model"] != model:
+                        raise ActiveReviewError("This request ID was already used with a different model.")
                     db.commit()
                     return ReviewRun.model_validate(dict(previous)), False
                 detail = get_snippet(db, snippet_id)
@@ -79,9 +84,10 @@ class ReviewService:
                     raise LookupError("Snippet not found")
                 if not self.configured:
                     raise ReviewNotConfigured()
-                run = ReviewRun(id=uuid4(), snippet_id=snippet_id, status=ReviewStatus.QUEUED, created_at=now())
-                db.execute("INSERT INTO review_runs VALUES (?, ?, ?, ?, ?, ?, ?)", (
-                    str(run.id), str(snippet_id), run.status.value, run.created_at.isoformat(), None, None, None,
+                selected = select_model(model, self.default_model, self.providers)
+                run = ReviewRun(id=uuid4(), snippet_id=snippet_id, model=selected, status=ReviewStatus.QUEUED, created_at=now())
+                db.execute("INSERT INTO review_runs (id, snippet_id, status, created_at, started_at, finished_at, error, model) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (
+                    str(run.id), str(snippet_id), run.status.value, run.created_at.isoformat(), None, None, None, selected,
                 ))
                 db.execute("INSERT INTO review_submissions VALUES (?, ?, ?)", (
                     str(snippet_id), str(client_request_id), str(run.id),
@@ -120,7 +126,7 @@ class ReviewService:
                     if not changed:
                         return
                     with trace_subject(run.id):
-                        output = await self.reviewer.review(snippet)
+                        output = await self.providers[run.model].review(snippet)
                     output = parse_review_output(output.model_dump(), snippet.code)
                     with closing(open_database(self.path, migrate=False)) as db:
                         db.execute("BEGIN IMMEDIATE")

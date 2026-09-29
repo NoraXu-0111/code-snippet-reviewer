@@ -9,10 +9,10 @@ IDs are UUIDs; timestamps are UTC ISO 8601. JSON uses camelCase and SQL uses sna
 | Entity | Core fields and ownership |
 | --- | --- |
 | Snippet | id, title, language, code, createdAt |
-| ReviewRun | id, snippetId, status, createdAt, startedAt, finishedAt, error |
+| ReviewRun | id, snippetId, model, status, createdAt, startedAt, finishedAt, error |
 | Finding | id, reviewRunId, startLine, endLine, severity, category, description, suggestedFix, resolution |
 | DiscussionConversation | id, findingId, createdAt |
-| DiscussionTurn | id, findingId, conversationId, clientRequestId, userMessage, assistantMessage, status, attempt, timestamps, error |
+| DiscussionTurn | id, findingId, conversationId, clientRequestId, userMessage, assistantMessage, model, status, attempt, timestamps, error |
 
 Limits: title 1–120 characters, language 1–50, nonblank code up to 100,000 Unicode code points, nonblank question up to 4,000. Unknown languages remain valid and render as plain text. Severity is `critical | warning | info`; category is `bug | style | performance | security`. An omitted suggested fix normalizes to null.
 
@@ -48,21 +48,30 @@ Turn invariants:
 - Only the latest failed turn within the selected conversation can retry in place. The client supplies its current attempt; retry increments it, and completion writes must match it. Another active reply blocks retry.
 - Restart marks unfinished turns failed while retaining questions/history. New reviews create new findings and do not copy or match conversations.
 
+## Model selection
+
+`GET /api/models` returns `{provider: "openai", defaultModel, models: [{id, name}]}` without using the provider key. The curated catalog includes GPT-4.1 mini, GPT-4.1, GPT-4.1 nano, plus an operator-configured default if different. The app default comes from `OPENAI_MODEL`; a browser-local preference selects defaults for new UI requests.
+
+Review and question POST bodies accept optional `model`. Omitting it on a new request resolves/persists the current app default. Unsupported choices return 400 without creating a job. An explicit model that differs on an existing request UUID returns 409; omission on replay recovers the original job even if defaults changed. Reply retries retain the persisted model. If a previously configured model is removed from the catalog, retry fails explicitly rather than silently switching models; existing results/replays remain readable.
+
+Migration 007 adds nullable `model` to review runs and discussion turns, backfilling only from matching trace subjects (and turn attempts). Unknown historical models stay null. A retry of an unknown legacy reply records the current default for its new attempt. Provider adapters have separate model settings, so request choices do not mutate global configuration and model-call spans identify the selected model. Model availability is determined by the actual OpenAI call; no list request or fallback generation is made.
+
 ## HTTP surface
 
 | Method | Path | Request / response |
 | --- | --- | --- |
+| GET | /api/models | `{provider, defaultModel, models}`; curated OpenAI choices |
 | GET | /api/health | `{status: "ok", database: "connected"}` |
 | POST | /api/snippets | `{title, language, code}` -> 201 Snippet |
 | GET | /api/snippets | Optional `language`, `reviewStatus` -> `{snippets, languages}` |
 | GET | /api/snippets/:id | `{snippet, latestReview}` |
 | GET | /api/snippets/:id/reviews | `{reviews}` newest first |
-| POST | /api/snippets/:id/reviews | Required `{clientRequestId}` -> 202 new ReviewRun; 200 replay |
+| POST | /api/snippets/:id/reviews | `{clientRequestId, model?}` -> 202 new ReviewRun; 200 replay |
 | GET | /api/reviews/:id | `{review, findings}` from one snapshot |
 | PATCH | /api/findings/:id | `{resolution}` -> updated Finding |
 | GET | /api/findings/:id/discussion | Optional `conversationId`, default original -> `{conversationId, conversations, hasActiveReply, turns}` |
 | POST | /api/findings/:id/conversations | `{clientRequestId}` -> 201 new conversation; 200 replay |
-| POST | /api/findings/:id/discussion | `{message, clientRequestId, conversationId?}` -> 202 new turn; 200 replay |
+| POST | /api/findings/:id/discussion | `{message, clientRequestId, conversationId?, model?}` -> 202 new turn; 200 replay |
 | POST | /api/discussion-turns/:id/retry | `{attempt}` -> 202 turn with incremented attempt |
 | GET | /api/quality/catalog | Evaluation sources and saved session progress |
 | POST | /api/quality/sessions | `{sourceId, reviewer}` -> create/resume frozen session |

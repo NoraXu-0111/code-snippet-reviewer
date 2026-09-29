@@ -10,9 +10,10 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import PROJECT_ROOT, Settings, get_settings
-from .contracts import CreateReview, CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
+from .contracts import ModelCatalog, CreateReview, CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
 from .contracts import CreateConversation, DiscussionConversation, CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, RetryDiscussionTurn, ReviewHistory
 from .database import open_database
+from .models import InvalidModel, model_catalog
 from .tracing import recover_traces
 from . import findings, snippets
 from .quality import quality_router
@@ -25,16 +26,19 @@ from .discussions import DiscussionConflict, DiscussionNotConfigured, Discussion
 def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = None,
                discussion_provider: DiscussionProvider | None = None) -> FastAPI:
     settings = settings or get_settings()
+    catalog = model_catalog(settings.openai_model)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         open_database(settings.database_path).close()
         slots = asyncio.Semaphore(2)
         service = ReviewService(settings.database_path, reviewer or OpenAIReviewer(settings), settings.review_timeout_seconds, slots,
-                                configured=reviewer is not None or bool(settings.openai_api_key))
+                                configured=reviewer is not None or bool(settings.openai_api_key), default_model=settings.openai_model,
+                                providers={item.id: reviewer or OpenAIReviewer(settings.model_copy(update={"openai_model": item.id})) for item in catalog.models})
         discussions = DiscussionService(settings.database_path, discussion_provider or OpenAIDiscussionProvider(settings),
                                         settings.review_timeout_seconds, slots,
-                                        configured=discussion_provider is not None or bool(settings.openai_api_key))
+                                        configured=discussion_provider is not None or bool(settings.openai_api_key), default_model=settings.openai_model,
+                                        providers={item.id: discussion_provider or OpenAIDiscussionProvider(settings.model_copy(update={"openai_model": item.id})) for item in catalog.models})
         recover_traces(settings.database_path)
         service.recover_interrupted()
         discussions.recover_interrupted()
@@ -46,6 +50,14 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
             await asyncio.gather(service.close(), discussions.close())
 
     app = FastAPI(title="Code Snippet Reviewer", version="0.1.0", lifespan=lifespan)
+
+    @app.get("/api/models", response_model=ModelCatalog)
+    def models() -> ModelCatalog:
+        return catalog
+
+    @app.exception_handler(InvalidModel)
+    async def invalid_model(request: Request, exc: InvalidModel):
+        return JSONResponse(status_code=400, content={"error": {"code": "invalid_model", "message": str(exc)}})
 
     @app.exception_handler(DiscussionConflict)
     async def discussion_conflict(request: Request, exc: DiscussionConflict):
@@ -114,7 +126,7 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
               responses={200: {"model": ReviewRun}, 400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
     async def start_review(snippet_id: UUID, payload: CreateReview, response: Response) -> ReviewRun:
         try:
-            run, created = app.state.reviews.submit(snippet_id, payload.client_request_id)
+            run, created = app.state.reviews.submit(snippet_id, payload.client_request_id, payload.model)
             response.status_code = 202 if created else 200
             return run
         except ReviewNotConfigured:

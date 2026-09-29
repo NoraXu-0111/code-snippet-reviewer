@@ -7,6 +7,25 @@ import {
   type ReviewRun,
 } from "./api";
 import { FindingCard } from "./FindingCard";
+import { ModelPicker, useModelChoice } from "./ModelPicker";
+
+type Submission = { clientRequestId: string; model: string | null };
+function readSubmission(key: string): Submission | null {
+  const raw = sessionStorage.getItem(key);
+  if (!raw) return null;
+  // Preserve request IDs from versions before model selection.
+  if (/^[0-9a-f-]{36}$/i.test(raw))
+    return { clientRequestId: raw, model: null };
+  const parsed = JSON.parse(raw);
+  if (
+    typeof parsed.clientRequestId !== "string" ||
+    (parsed.model !== null && typeof parsed.model !== "string")
+  )
+    throw new Error(
+      "The saved review submission is unreadable. Refresh status before starting another review.",
+    );
+  return parsed;
+}
 
 export function ReviewPanel({
   snippetId,
@@ -27,10 +46,11 @@ export function ReviewPanel({
   selectedFindingId?: string;
   onSelectFinding: (finding: Finding) => void;
 }) {
+  const choice = useModelChoice();
   const storageKey = `review-submission:${snippetId}`;
   const [pending, setPending] = useState(() => {
     try {
-      return sessionStorage.getItem(storageKey);
+      return readSubmission(storageKey);
     } catch {
       return null;
     }
@@ -55,30 +75,34 @@ export function ReviewPanel({
     latestReview?.status === "queued" || latestReview?.status === "running";
   const active = review?.status === "queued" || review?.status === "running";
   async function start() {
-    if (sending.current || (latestActive && !pending)) return;
+    if (sending.current || (!pending && (latestActive || !choice.model)))
+      return;
     sending.current = true;
     setSubmitting(true);
     setSubmitError("");
     try {
       // Persist before sending: a lost response/reload must reuse this identity.
-      let requestId: string;
+      let submission: Submission;
       try {
-        requestId = sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
-        sessionStorage.setItem(storageKey, requestId);
+        submission = readSubmission(storageKey) ?? {
+          clientRequestId: crypto.randomUUID(),
+          model: choice.model!,
+        };
+        sessionStorage.setItem(storageKey, JSON.stringify(submission));
       } catch {
         throw new Error(
           "Browser storage is unavailable. Enable it before starting a review so interrupted submissions can be recovered.",
         );
       }
-      setPending(requestId);
+      setPending(submission);
       await request<ReviewRun>(`/snippets/${snippetId}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientRequestId: requestId }),
+        body: JSON.stringify(submission),
       });
       if (!mounted.current) return;
       // Storage failure keeps recovery available; replaying is safe.
-      if (sessionStorage.getItem(storageKey) === requestId)
+      if (sessionStorage.getItem(storageKey) === JSON.stringify(submission))
         sessionStorage.removeItem(storageKey);
       setPending(null);
       onStarted();
@@ -150,9 +174,20 @@ export function ReviewPanel({
           </button>
         </div>
       )}
+      {review && (
+        <p className="muted small">
+          Review model: {review.model ?? "Not recorded (older review)"}
+        </p>
+      )}
+      <ModelPicker
+        choice={choice}
+        label="Model for next review"
+        disabled={submitting || latestActive || !!pending}
+        frozenModel={pending?.model}
+      />
       <button
         className="primary review-button"
-        disabled={submitting || (latestActive && !pending)}
+        disabled={submitting || (!pending && (latestActive || !choice.model))}
         onClick={start}
       >
         {submitting

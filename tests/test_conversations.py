@@ -139,6 +139,7 @@ def test_migration_preserves_original_turns_and_enforces_finding_ownership(tmp_p
     with closing(open_database(path)) as db:
         migrated = dict(db.execute('SELECT * FROM discussion_turns WHERE id=?',(turn,)).fetchone())
         assert migrated.pop('conversation_id') == finding
+        assert migrated.pop('model') is None
         assert migrated == previous
         assert db.execute('SELECT resolution FROM findings WHERE id=?',(finding,)).fetchone()[0] == 'accepted'
         assert db.execute('SELECT finding_id FROM discussion_conversations WHERE id=?',(finding,)).fetchone()[0] == finding

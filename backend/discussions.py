@@ -10,6 +10,7 @@ from .database import open_database
 from .discussion_provider import DiscussionFailure, DiscussionProvider
 from .reviews import now
 from .tracing import trace_subject
+from .models import select_model
 
 
 class DiscussionConflict(Exception):
@@ -79,9 +80,11 @@ def load_context(db: sqlite3.Connection, turn: DiscussionTurn) -> tuple[Snippet,
 class DiscussionService:
     """One process per database, with attempt-guarded writes and durable questions."""
 
-    def __init__(self, path: Path, provider: DiscussionProvider, timeout: float, slots: asyncio.Semaphore, *, configured: bool = True):
+    def __init__(self, path: Path, provider: DiscussionProvider, timeout: float, slots: asyncio.Semaphore, *, configured: bool = True, default_model: str = "gpt-4.1-mini", providers: dict[str, DiscussionProvider] | None = None):
         self.path, self.provider, self.timeout, self.slots = path, provider, timeout, slots
         self.configured = configured
+        self.default_model = default_model
+        self.providers = providers if providers is not None else {default_model: provider}
         self.tasks: set[asyncio.Task] = set()
 
     def recover_interrupted(self) -> None:
@@ -101,20 +104,21 @@ class DiscussionService:
                 existing = db.execute("SELECT * FROM discussion_turns WHERE finding_id = ? AND client_request_id = ?",
                                       (str(finding_id), str(payload.client_request_id))).fetchone()
                 if existing:
-                    if existing["user_message"] != payload.message or existing["conversation_id"] != str(conversation_id):
-                        raise DiscussionConflict("This request ID was already used for a different question or conversation.")
+                    if existing["user_message"] != payload.message or existing["conversation_id"] != str(conversation_id) or (payload.model is not None and existing["model"] != payload.model):
+                        raise DiscussionConflict("This request ID was already used for a different question, conversation, or model.")
                     db.commit()
                     return DiscussionTurn.model_validate(dict(existing)), False
                 if db.execute("SELECT 1 FROM discussion_turns WHERE finding_id = ? AND status IN ('queued', 'running')", (str(finding_id),)).fetchone():
                     raise DiscussionConflict("This finding already has a reply in progress. Refresh the conversation.")
                 if not self.configured:
                     raise DiscussionNotConfigured()
+                selected = select_model(payload.model, self.default_model, self.providers)
                 turn = DiscussionTurn(id=uuid4(), finding_id=finding_id, conversation_id=conversation_id, client_request_id=payload.client_request_id,
-                                      user_message=payload.message, status=ReviewStatus.QUEUED, attempt=1, created_at=now())
+                                      user_message=payload.message, model=selected, status=ReviewStatus.QUEUED, attempt=1, created_at=now())
                 db.execute("""INSERT INTO discussion_turns
-                    (id, finding_id, conversation_id, client_request_id, user_message, status, attempt, created_at)
-                    VALUES (?, ?, ?, ?, ?, 'queued', 1, ?)""",
-                    (str(turn.id), str(finding_id), str(conversation_id), str(payload.client_request_id), turn.user_message, turn.created_at.isoformat()))
+                    (id, finding_id, conversation_id, client_request_id, user_message, status, attempt, created_at, model)
+                    VALUES (?, ?, ?, ?, ?, 'queued', 1, ?, ?)""",
+                    (str(turn.id), str(finding_id), str(conversation_id), str(payload.client_request_id), turn.user_message, turn.created_at.isoformat(), selected))
                 db.commit()
             except Exception:
                 db.rollback()
@@ -136,9 +140,11 @@ class DiscussionService:
                     raise DiscussionConflict("This finding already has a reply in progress. Wait for it to finish.")
                 if not self.configured:
                     raise DiscussionNotConfigured()
+                # A retry retains the original model even if the application default changed.
+                selected = select_model(row["model"], self.default_model, self.providers)
                 updated = db.execute("""UPDATE discussion_turns SET status = 'queued', attempt = attempt + 1,
-                    started_at = NULL, finished_at = NULL, error = NULL, assistant_message = NULL
-                    WHERE id = ? RETURNING *""", (str(turn_id),)).fetchone()
+                    started_at = NULL, finished_at = NULL, error = NULL, assistant_message = NULL, model = ?
+                    WHERE id = ? RETURNING *""", (selected, str(turn_id))).fetchone()
                 turn = DiscussionTurn.model_validate(dict(updated))
                 db.commit()
             except Exception:
@@ -176,7 +182,7 @@ class DiscussionService:
                             return
                         snippet, finding, history = load_context(db, turn)
                     with trace_subject(turn.id, turn.attempt):
-                        answer = await self.provider.reply(snippet, finding, history, turn.user_message)
+                        answer = await self.providers[turn.model].reply(snippet, finding, history, turn.user_message)
                     self._succeed(turn, answer)
         except asyncio.CancelledError:
             self._fail(turn, "Reply interrupted by server shutdown. Please retry.")

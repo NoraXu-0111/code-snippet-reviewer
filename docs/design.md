@@ -16,6 +16,8 @@ React + TypeScript -> FastAPI + Pydantic -> SQLite
 
 React owns interaction and polling. FastAPI owns validation and context selection. Pydantic generates the OpenAPI schema and TypeScript contracts. SQLite avoids an external database service and provides transactions, foreign keys, and partial unique indexes. Checksummed migrations are append-only. Hash routes preserve frontend URLs without server-side route fallback.
 
+A server-owned OpenAI catalog supplies the default and selectable models. Browser preference affects only new requests; each persisted job fixes its own model. Adapters receive separate settings per model, and traces record that same selection. Older model identities are recovered only from trace evidence.
+
 Provider adapters implement small `Reviewer` and `DiscussionProvider` protocols. Job services own persistence, timeouts, and retries; adapters own model requests and response interpretation. Tests can replace a provider while exercising the actual API and database.
 
 ## State and ownership

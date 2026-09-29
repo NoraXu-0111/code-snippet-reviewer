@@ -295,10 +295,15 @@ for (const reload of [false, true]) {
     const snippetId = page.url().split("/snippets/")[1]!.split("?")[0];
     const url = `/api/snippets/${snippetId}/reviews`;
     const identities: string[] = [];
+    const models: string[] = [];
+    await page
+      .getByRole("combobox", { name: "Model for next review", exact: true })
+      .selectOption("gpt-4.1");
     let drop = true;
     await page.route(`**${url}`, async (route) => {
       if (route.request().method() !== "POST") return route.continue();
       identities.push(route.request().postDataJSON().clientRequestId);
+      models.push(route.request().postDataJSON().model);
       const response = await route.fetch();
       expect(response.ok()).toBeTruthy();
       if (drop) {
@@ -318,7 +323,24 @@ for (const reload of [false, true]) {
         return history.reviews[0]?.status;
       })
       .toBe("succeeded");
+    // A changed browser preference must not alter a request awaiting confirmation.
+    await page.evaluate(() => {
+      localStorage.setItem("preferred-openai-model", "gpt-4.1-nano");
+      window.dispatchEvent(new Event("model-preference-changed"));
+    });
     if (reload) await page.reload();
+    await expect(
+      page.getByRole("combobox", {
+        name: "Model for next review",
+        exact: true,
+      }),
+    ).toHaveValue("gpt-4.1");
+    await expect(
+      page.getByRole("combobox", {
+        name: "Model for next review",
+        exact: true,
+      }),
+    ).toBeDisabled();
     await page
       .getByRole("button", { name: "Check submission", exact: true })
       .click();
@@ -330,6 +352,7 @@ for (const reload of [false, true]) {
     ).toBeVisible();
     expect(identities).toHaveLength(2);
     expect(identities[1]).toBe(identities[0]);
+    expect(models).toEqual(["gpt-4.1", "gpt-4.1"]);
     expect((await (await page.request.get(url)).json()).reviews).toHaveLength(
       1,
     );
@@ -356,8 +379,131 @@ for (const reload of [false, true]) {
       .toBe(2);
     expect(identities).toHaveLength(3);
     expect(identities[2]).not.toBe(identities[0]);
+    expect(models[2]).toBe("gpt-4.1-nano");
     expect((await (await page.request.get(url)).json()).reviews).toHaveLength(
       2,
     );
   });
 }
+
+test("model preference persists while historical reviews and reply retries retain their models", async ({
+  page,
+}, testInfo) => {
+  await create(page);
+  const picker = page.getByRole("combobox", {
+    name: "Model for next review",
+    exact: true,
+  });
+  await expect(picker).toHaveValue("gpt-4.1-mini");
+  await picker.selectOption("gpt-4.1");
+  await page.reload();
+  await expect(picker).toHaveValue("gpt-4.1");
+  await review(page);
+  await expect(
+    page.getByText("Review model: gpt-4.1", { exact: true }),
+  ).toBeVisible();
+  await picker.selectOption("gpt-4.1-nano");
+  await expect(
+    page.getByText("Review model: gpt-4.1", { exact: true }),
+  ).toBeVisible();
+  await discuss(page);
+  const replyPicker = page.getByRole("combobox", {
+    name: "Model for next reply",
+    exact: true,
+  });
+  await expect(replyPicker).toHaveValue("gpt-4.1-nano");
+  await page.getByLabel("Ask a follow-up", { exact: true }).fill("fail once");
+  await page
+    .getByRole("button", { name: "Send question", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Retry reply", exact: true }),
+  ).toBeVisible();
+  await replyPicker.selectOption("gpt-4.1-mini");
+  await page.getByRole("button", { name: "Retry reply", exact: true }).click();
+  await expect(
+    page.getByText("Answer with 0 earlier exchanges.", { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator(".chat-assistant .chat-author")).toHaveText([
+    "AI · gpt-4.1-nano",
+  ]);
+  await page
+    .getByLabel("Ask a follow-up", { exact: true })
+    .fill("Follow up using the new selection");
+  await page
+    .getByRole("button", { name: "Send question", exact: true })
+    .click();
+  await expect(
+    page.getByText("Answer with 1 earlier exchanges.", { exact: false }),
+  ).toBeVisible();
+  await page.reload();
+  await discuss(page);
+  await expect(replyPicker).toHaveValue("gpt-4.1-mini");
+  await expect(page.locator(".chat-assistant .chat-author")).toHaveText([
+    "AI · gpt-4.1-nano",
+    "AI · gpt-4.1-mini",
+  ]);
+  await expect(
+    page.getByText("Review model: gpt-4.1", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: `work/model-picker-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+});
+
+test("legacy pending review IDs recover without changing the recorded model", async ({
+  page,
+}) => {
+  await create(page);
+  const snippetId = page.url().split("/snippets/")[1]!.split("?")[0];
+  const requestId = crypto.randomUUID();
+  const response = await page.request.post(
+    `/api/snippets/${snippetId}/reviews`,
+    {
+      data: { clientRequestId: requestId, model: "gpt-4.1" },
+    },
+  );
+  expect(response.status()).toBe(202);
+  const run = await response.json();
+  await expect
+    .poll(
+      async () =>
+        (await (await page.request.get(`/api/reviews/${run.id}`)).json()).review
+          .status,
+    )
+    .toBe("succeeded");
+  await page.evaluate(
+    ({ snippetId, requestId }) => {
+      sessionStorage.setItem(`review-submission:${snippetId}`, requestId);
+      localStorage.setItem("preferred-openai-model", "gpt-4.1-nano");
+    },
+    { snippetId, requestId },
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Check submission", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Run new review", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText("Review model: gpt-4.1", { exact: true }),
+  ).toBeVisible();
+  expect(
+    (
+      await (
+        await page.request.get(`/api/snippets/${snippetId}/reviews`)
+      ).json()
+    ).reviews,
+  ).toHaveLength(1);
+  expect(
+    (await (await page.request.get(`/test/reviewer-calls/${snippetId}`)).json())
+      .calls,
+  ).toBe(1);
+});

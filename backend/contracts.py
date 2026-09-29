@@ -89,16 +89,30 @@ class ExecutionState(Contract):
         return self
 
 
+class ModelOption(Contract):
+    id: str
+    name: str
+
+
+class ModelCatalog(Contract):
+    provider: Literal["openai"] = "openai"
+    default_model: str
+    models: list[ModelOption]
+
+
 class CreateReview(Contract):
     client_request_id: UUID
+    model: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class ReviewRun(ExecutionState):
+    model: str | None = None
     id: UUID
     snippet_id: UUID
 
 
 class CreateDiscussionTurn(Contract):
+    model: str | None = Field(default=None, min_length=1, max_length=200)
     conversation_id: UUID | None = None
     message: str = Field(min_length=1, max_length=4000)
     client_request_id: UUID
@@ -116,6 +130,7 @@ class RetryDiscussionTurn(Contract):
 
 
 class DiscussionTurn(ExecutionState):
+    model: str | None = None
     conversation_id: UUID
     id: UUID
     finding_id: UUID

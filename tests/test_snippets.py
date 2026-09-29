@@ -64,7 +64,7 @@ def test_filter_latest_review_and_combination(workspace):
     now = "2026-09-28T00:00:00Z"
     with closing(open_database(settings.database_path)) as db:
         def run(snippet, status, error=None):
-            db.execute("INSERT INTO review_runs VALUES (?, ?, ?, ?, ?, ?, ?)", (
+            db.execute("INSERT INTO review_runs (id, snippet_id, status, created_at, started_at, finished_at, error) VALUES (?, ?, ?, ?, ?, ?, ?)", (
                 str(uuid4()), snippet["id"], status, now, now,
                 now if status in ("succeeded", "failed") else None, error,
             ))

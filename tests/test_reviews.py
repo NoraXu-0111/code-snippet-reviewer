@@ -131,7 +131,7 @@ def test_recover_interrupted_and_cancel_on_shutdown(tmp_path):
     with closing(open_database(settings.database_path)) as db:
         assert db.execute("SELECT status FROM review_runs WHERE id = ?", (run_id,)).fetchone()[0] == "failed"
         interrupted = str(uuid4())
-        db.execute("INSERT INTO review_runs VALUES (?, ?, 'running', ?, ?, NULL, NULL)", (interrupted, snippet, "2026-09-28T00:00:00Z", "2026-09-28T00:00:00Z"))
+        db.execute("INSERT INTO review_runs (id, snippet_id, status, created_at, started_at, finished_at, error) VALUES (?, ?, 'running', ?, ?, NULL, NULL)", (interrupted, snippet, "2026-09-28T00:00:00Z", "2026-09-28T00:00:00Z"))
     with TestClient(create_app(settings, reviewer=FakeReviewer())) as client:
         recovered = client.get(f"/api/reviews/{interrupted}").json()
         assert recovered["review"]["status"] == "failed"
@@ -213,7 +213,7 @@ def test_review_detail_uses_one_snapshot_during_concurrent_completion(tmp_path, 
     timestamp = "2026-09-28T00:00:00Z"
     with closing(open_database(path)) as writer:
         writer.execute("INSERT INTO snippets VALUES (?, 'Test', 'python', '1 / 0', ?)", (snippet, timestamp))
-        writer.execute("INSERT INTO review_runs VALUES (?, ?, 'running', ?, ?, NULL, NULL)", (run, snippet, timestamp, timestamp))
+        writer.execute("INSERT INTO review_runs (id, snippet_id, status, created_at, started_at, finished_at, error) VALUES (?, ?, 'running', ?, ?, NULL, NULL)", (run, snippet, timestamp, timestamp))
 
         class InterleavedConnection(sqlite3.Connection):
             completed = False
