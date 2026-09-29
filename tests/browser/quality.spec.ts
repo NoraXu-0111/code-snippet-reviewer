@@ -214,3 +214,77 @@ test("concurrent tabs cannot overwrite a newer human judgment", async ({
   );
   await other.close();
 });
+
+test("footer advances saved first-step drafts instead of showing a disabled complete button", async ({
+  page,
+}) => {
+  await page.goto("/#/quality");
+  await page.getByLabel("Reviewer name").fill(`Continue ${Date.now()}`);
+  await page.getByRole("button", { name: "Start / resume review" }).click();
+  const nextReference = page.getByRole("button", {
+    name: "Continue to reference",
+    exact: true,
+  });
+  await expect(nextReference).toBeEnabled();
+  await nextReference.click();
+  await expect(page.getByRole("alert")).toContainText("Step 1:");
+  await expect(page.getByRole("alert")).toBeInViewport();
+  await expect(
+    page.getByRole("heading", { name: "1. Your independent assessment" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("heading", { name: "2. Validate the proposed reference" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("radio", { name: "I'm not sure yet", exact: true })
+    .check();
+  await page.getByRole("radio", { name: "I'm not sure", exact: true }).check();
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("revision 1");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Complete & next case" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Continue to reference", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "2. Validate the proposed reference" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("radio", { name: "I'm not sure yet", exact: true }),
+  ).toBeChecked();
+  const nextOutputs = page.getByRole("button", {
+    name: "Continue to model outputs",
+    exact: true,
+  });
+  await nextOutputs.click();
+  await expect(page.getByRole("alert")).toContainText("Step 2:");
+  await expect(page.getByRole("alert")).toBeInViewport();
+  await expect(
+    page.getByRole("heading", { name: "3. Assess the model outputs" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("combobox", { name: "Reference verdict", exact: true })
+    .selectOption("uncertain");
+  await page
+    .getByRole("radio", { name: "Need help verifying this", exact: true })
+    .check();
+  await nextOutputs.click();
+  await expect(
+    page.getByRole("heading", { name: "3. Assess the model outputs" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Complete & next case" }),
+  ).toBeEnabled();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.getByText("0/10 cases completed", { exact: false }),
+  ).toBeVisible();
+  const sessionId = page.url().split("/quality/")[1]!.split("?")[0];
+  const stored = await (
+    await page.request.get(`/api/quality/sessions/${sessionId}`)
+  ).json();
+  expect(stored.annotations["empty-average"].revision).toBe(1);
+  expect(stored.annotations["empty-average"].status).toBe("draft");
+});

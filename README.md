@@ -87,7 +87,7 @@ See [data and API contracts](docs/data-contract.md) for invariants and implement
 
 Default model: [`gpt-4.1-mini`](https://developers.openai.com/api/docs/models/gpt-4.1-mini), configurable through `.env`. Responses and severity judgments remain model-generated suggestions; broader quality evaluation and severity calibration are future work.
 
-Validation: 72 automated backend/grader/annotation tests and 14 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
+Validation: 72 automated backend/grader/annotation tests and 16 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
 
 ## Finding interaction
 

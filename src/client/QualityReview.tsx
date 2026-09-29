@@ -520,9 +520,34 @@ function CaseEditor({
       draft.findings?.some((finding) => finding.verdict !== "pending") ||
       false,
   );
+  const stepHeadings = useRef<(HTMLHeadingElement | null)[]>([]);
+  const [focusStep, setFocusStep] = useState<number | null>(null);
+  useEffect(() => {
+    if (focusStep === null) return;
+    const heading = stepHeadings.current[focusStep];
+    heading?.scrollIntoView({ block: "start", behavior: "instant" });
+    heading?.focus({ preventScroll: true });
+    setFocusStep(null);
+  }, [focusStep, showReference, showOutput]);
+  function revealStep(step: number) {
+    if (step >= 2) setShowReference(true);
+    if (step >= 3) setShowOutput(true);
+    setFocusStep(step);
+  }
+  const independentReady =
+    ((draft.independentVerdict ?? "pending") !== "pending" ||
+      !!draft.independentNotes?.trim()) &&
+    ((draft.contractClarity ?? "pending") !== "pending" ||
+      !!draft.contractNotes?.trim());
+  const referenceReady =
+    draft.referenceVerdict !== "pending" &&
+    ((draft.referenceReason ?? "pending") !== "pending" ||
+      !!draft.referenceNotes?.trim());
+  const visibleStep = !showReference ? 1 : !showOutput ? 2 : 3;
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [error, setError] = useState("");
+  const [errorStep, setErrorStep] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [storageError, setStorageError] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(base.current);
@@ -567,11 +592,35 @@ function CaseEditor({
       ),
     });
   }
+  function continueAssessment() {
+    setError("");
+    setErrorStep(null);
+    if (!independentReady) {
+      setErrorStep(1);
+      setError(
+        "Step 1: choose your code assessment and whether the inputs / behavior are clear. Notes are optional.",
+      );
+      revealStep(1);
+    } else if (!showReference) {
+      revealStep(2);
+    } else if (!referenceReady) {
+      setErrorStep(2);
+      setError(
+        "Step 2: choose a reference verdict and its reason. Notes are optional.",
+      );
+      revealStep(2);
+    } else if (!showOutput) {
+      revealStep(3);
+    } else {
+      void save("completed", !!onNext);
+    }
+  }
   async function save(status: "draft" | "completed", next = false) {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
     setError("");
+    setErrorStep(null);
     setMessage("");
     try {
       const result = await request<Saved>(
@@ -608,6 +657,14 @@ function CaseEditor({
   }
   return (
     <article className="quality-editor">
+      <p className="quality-step-progress" aria-label="Review progress">
+        Step {visibleStep} of 3 ·{" "}
+        {visibleStep === 1
+          ? "Your code assessment"
+          : visibleStep === 2
+            ? "Check the proposed reference"
+            : "Assess the model outputs"}
+      </p>
       <section className="panel">
         <div className="section-heading">
           <h2>{caseData.id}</h2>
@@ -617,7 +674,19 @@ function CaseEditor({
       </section>
       <fieldset disabled={busy}>
         <section className="panel quality-intro">
-          <h2>1. Your independent assessment</h2>
+          <h2
+            ref={(node) => {
+              stepHeadings.current[1] = node;
+            }}
+            tabIndex={-1}
+          >
+            1. Your independent assessment
+          </h2>
+          {error && errorStep === 1 && (
+            <p className="error-panel" role="alert">
+              {error}
+            </p>
+          )}
           <p className="muted small">
             The model saw the code and language, plus the review prompt.
             Reference notes below were not part of its input. Do not grade
@@ -686,7 +755,7 @@ function CaseEditor({
                 ((draft.contractClarity ?? "pending") === "pending" &&
                   !draft.contractNotes?.trim())
               }
-              onClick={() => setShowReference(true)}
+              onClick={() => revealStep(2)}
             >
               Reveal proposed reference
             </button>
@@ -694,7 +763,19 @@ function CaseEditor({
         </section>
         {showReference && (
           <section className="panel quality-intro">
-            <h2>2. Validate the proposed reference</h2>
+            <h2
+              ref={(node) => {
+                stepHeadings.current[2] = node;
+              }}
+              tabIndex={-1}
+            >
+              2. Validate the proposed reference
+            </h2>
+            {error && errorStep === 2 && (
+              <p className="error-panel" role="alert">
+                {error}
+              </p>
+            )}
             <p className="muted small">
               AI-authored development labels. Challenge them when evidence or
               requirements are missing.
@@ -804,7 +885,7 @@ function CaseEditor({
                   ((draft.referenceReason ?? "pending") === "pending" &&
                     !draft.referenceNotes?.trim())
                 }
-                onClick={() => setShowOutput(true)}
+                onClick={() => revealStep(3)}
               >
                 Reveal model outputs
               </button>
@@ -813,7 +894,14 @@ function CaseEditor({
         )}
         {showReference && showOutput && (
           <section className="panel quality-intro">
-            <h2>3. Assess the model outputs</h2>
+            <h2
+              ref={(node) => {
+                stepHeadings.current[3] = node;
+              }}
+              tabIndex={-1}
+            >
+              3. Assess the model outputs
+            </h2>
             <p className="muted small">
               Correct = a real supported issue; Incorrect = a false claim;
               Uncertain = insufficient context; Duplicate = the same issue
@@ -1027,7 +1115,7 @@ function CaseEditor({
             before loading the saved version.
           </p>
         )}
-        {error && (
+        {error && errorStep === null && (
           <p className="error-panel" role="alert">
             {error}
           </p>
@@ -1042,10 +1130,16 @@ function CaseEditor({
           </button>
           <button
             className="primary"
-            disabled={busy || stale || !showOutput}
-            onClick={() => void save("completed", !!onNext)}
+            disabled={busy || stale}
+            onClick={continueAssessment}
           >
-            {onNext ? "Complete & next case" : "Complete case"}
+            {!showReference
+              ? "Continue to reference"
+              : !showOutput
+                ? "Continue to model outputs"
+                : onNext
+                  ? "Complete & next case"
+                  : "Complete case"}
           </button>
           <button
             className="text-button"
@@ -1084,6 +1178,8 @@ function CaseEditor({
           )}
         </div>
         <p className="muted small">
+          {visibleStep < 3 &&
+            `This case has three steps. You are on step ${visibleStep}; use Continue to reach the next step. `}
           Choose an answer for each question and a reason for each verdict. All
           written notes are optional. “Uncertain” is a valid completed
           assessment and is not an approved reference.

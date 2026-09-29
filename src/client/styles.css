@@ -1084,3 +1084,13 @@ button.finding-lines[aria-pressed="true"] {
   color: #617065;
   font-size: 13px;
 }
+
+.quality-step-progress {
+  margin: 0 0 16px;
+  color: #245c42;
+  font-weight: 650;
+  font-size: 14px;
+}
+.quality-editor h2[tabindex] {
+  scroll-margin-top: 24px;
+}
