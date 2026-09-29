@@ -43,7 +43,7 @@ def run(history=None):
 def test_full_context_role_order_plaintext_and_request_controls(monkeypatch):
     captured = install_fake(monkeypatch, SimpleNamespace(status="completed", output=[], output_text="<script>plain text</script>\n  indented"))
     now = datetime.now(timezone.utc)
-    prior = DiscussionTurn(id=uuid4(), finding_id=uuid4(), client_request_id=uuid4(), user_message="An example?",
+    prior = DiscussionTurn(conversation_id=uuid4(), id=uuid4(), finding_id=uuid4(), client_request_id=uuid4(), user_message="An example?",
                            assistant_message="The prior example", status="succeeded", attempt=1, created_at=now, started_at=now, finished_at=now)
     assert run([prior]) == "<script>plain text</script>\n  indented"
     request = captured["request"]

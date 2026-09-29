@@ -95,6 +95,7 @@ class ReviewRun(ExecutionState):
 
 
 class CreateDiscussionTurn(Contract):
+    conversation_id: UUID | None = None
     message: str = Field(min_length=1, max_length=4000)
     client_request_id: UUID
 
@@ -111,6 +112,7 @@ class RetryDiscussionTurn(Contract):
 
 
 class DiscussionTurn(ExecutionState):
+    conversation_id: UUID
     id: UUID
     finding_id: UUID
     client_request_id: UUID
@@ -128,7 +130,20 @@ class DiscussionTurn(ExecutionState):
         return self
 
 
+class DiscussionConversation(Contract):
+    id: UUID
+    finding_id: UUID
+    created_at: AwareDatetime
+
+
+class CreateConversation(Contract):
+    client_request_id: UUID
+
+
 class DiscussionDetail(Contract):
+    conversation_id: UUID
+    conversations: list[DiscussionConversation]
+    has_active_reply: bool
     turns: list[DiscussionTurn]
 
 

@@ -68,7 +68,7 @@ Error envelope: `{ error: { code, message } }`. Validation failures use 400, unk
 
 ### User experience and boundaries
 
-- Each finding has a **Discuss** button that opens its conversation in a wide workspace below the code/finding panels. Closing it returns focus to the finding; unsent drafts are retained in browser session storage when available. Users can ask for an explanation, an example, a possible false positive, or a revised fix.
+- Each finding has a **Discuss** button that opens the selected conversation in a wide workspace below the code/finding panels. Closing it returns focus to the finding; unsent drafts are retained in browser session storage when available. Users can ask for an explanation, an example, a possible false positive, or a revised fix.
 - Show the user's question and the AI's answer in chronological order. Display pending, failed, and retry states alongside the relevant question. Conversation history survives page reloads and application restarts.
 - The composer is disabled while that finding has an active reply. Other findings remain usable, and users can collapse the conversation or navigate away while a reply is being generated.
 - Accept, dismiss, and reopen remain available independently of discussion. Users may discuss resolved findings. Sending a message does not change resolution, and changing resolution does not clear history.
@@ -81,10 +81,13 @@ Error envelope: `{ error: { code, message } }`. Validation failures use 400, unk
 Snippet
   └─ ReviewRun
        └─ Finding
+            └─ DiscussionConversation
             └─ DiscussionTurn (one user question + one AI reply attempt)
 ```
 
-One finding has one implicit conversation. `002_discussion_turns.sql` adds the `discussion_turns` table without changing the initial migration. A separate conversation/session table is unnecessary for this scope.
+One finding has one or more conversations. `005_discussion_conversations.sql` adds `discussion_conversations(id, finding_id, created_at)` and assigns every existing turn to the original conversation, whose ID equals its finding ID. It rebuilds the turn table transactionally with a required `conversation_id` and a composite foreign key `(conversation_id, finding_id)` to prevent cross-finding assignments. Old question/answer content, IDs, attempts and timestamps remain unchanged. Earlier migration files are immutable.
+
+**New conversation** creates a persisted empty conversation without a provider call; **Conversation** switches between histories. Each retains independent draft and uncertain-submission storage. The original conversation keeps the old storage keys to preserve pre-upgrade drafts. Selection is remembered in browser session storage. Creating a conversation uses a client UUID as its ID and idempotency key; after an uncertain response the UI replays the same key. No key is needed just to create a conversation. The API rejects new conversation creation while the finding has an active reply, but replay of an existing creation remains available. One active reply per finding still applies across all its conversations.
 
 Persist each question and its reply together as a turn, rather than storing an unpaired user message and assistant message. This gives the reply a clear execution state and makes retries possible without duplicating the visible question. The UI projects a turn into user/assistant chat bubbles.
 
@@ -92,6 +95,7 @@ Persist each question and its reply together as a turn, rather than storing an u
 | --- | --- |
 | id | Server-generated UUID |
 | findingId | Foreign key to the owning finding; required |
+| conversationId | Required owning conversation; must belong to the same finding |
 | clientRequestId | Client-generated UUID for idempotent submission |
 | userMessage | Nonblank question, up to 4,000 Unicode code points |
 | assistantMessage | Nullable plain text; required and nonblank only on success |
@@ -104,7 +108,7 @@ Persist each question and its reply together as a turn, rather than storing an u
 Invariants:
 
 - A partial unique index on `finding_id` permits at most one queued/running turn per finding. A unique constraint on `(finding_id, client_request_id)` prevents duplicate submissions.
-- Repeating the same request ID with the same question returns the existing turn without another provider call. Reusing it with different text returns 409. The client preserves its request ID after an uncertain network result and uses a new one for a new question.
+- Repeating the same request ID with the same question and conversation returns the existing turn without another provider call. Reusing it with different text or a different conversation returns 409. The client preserves its request ID after an uncertain network result and uses a new one for a new question.
 - Use the review state-shape rules for timestamps/errors. Successful turns have an answer and no error; queued/running/failed turns have no answer. An empty or missing AI answer is a failure, not a completed chat turn.
 - Order turns by `created_at, rowid`. Keep complete history in SQLite. No pagination is required for this local MVP.
 - Save the answer and successful state atomically. Completion writes must match both the turn ID and current attempt number so a stale attempt cannot overwrite a retry.
@@ -115,7 +119,7 @@ For each reply, construct context on the server from:
 
 1. The immutable snippet's code and language, with original source line numbers.
 2. The selected finding's line range, severity, category, description, and suggested fix.
-3. Up to the 10 most recent successful question/answer turns preceding the current turn, followed by the new question.
+3. Up to the 10 most recent successful question/answer turns from the selected conversation preceding the current turn, followed by the new question. A new conversation sends no earlier exchanges, even from the same finding.
 
 The prompt scopes the assistant to this finding and its snippet, permits it to explain uncertainty or acknowledge a false positive, and treats source code/comments as data. The server loads context through the finding's relationships; clients cannot provide replacement source code, arbitrary system prompts, or another finding's history.
 
@@ -126,7 +130,7 @@ Failed or incomplete turns are retained in the UI but excluded from model contex
 - Persist a queued turn before scheduling work, then return immediately. Reuse the application's in-process task execution pattern and share a two-call concurrency limit across review and conversation calls. This remains a single-backend-process design.
 - Apply the configured timeout to the whole reply attempt, including time waiting for a concurrency slot. The frontend polls every two seconds while a turn is active and restores state through GET after reload.
 - A lost submission response can be retried with the same `clientRequestId` to recover the persisted turn. A known failed generation uses the explicit retry endpoint.
-- Only the latest failed turn in a finding's conversation may be retried in place. Reset its answer/error and attempt timestamps, increment `attempt`, and keep its question, ID, and ordering. The retry request supplies the failed attempt number; stale/repeated retry requests return 409 rather than starting another call, and the client reloads state.
+- Only the latest failed turn in the selected conversation may be retried in place. Reset its answer/error and attempt timestamps, increment `attempt`, and keep its question, ID, and ordering. The retry request supplies the failed attempt number; stale/repeated retry requests return 409 rather than starting another call, and the client reloads state.
 - Users may ask a new question after a failure; failed exchanges do not enter model context. If a later question already exists, offer to copy/rephrase the old failed question as a new turn instead of retrying it out of order.
 - Shutdown cancels unfinished replies, and startup marks interrupted queued/running turns as failed with a retry message. Preserve the question and earlier answers. Provider/network errors use safe messages without exposing credentials, provider payloads, or stack traces.
 
@@ -136,15 +140,16 @@ These endpoints are implemented and use the existing camelCase conventions and e
 
 | Method | Path | Request / response |
 | --- | --- | --- |
-| GET | /api/findings/:id/discussion | 200 `{ turns: DiscussionTurn[] }`; chronological history including failures and active turns |
-| POST | /api/findings/:id/discussion | `{ message, clientRequestId }` -> 202 DiscussionTurn for a new queued turn; 200 for an identical idempotent replay |
+| GET | /api/findings/:id/discussion | Optional `conversationId` query (defaults to original); 200 `{ conversationId, conversations, hasActiveReply, turns }`; turns belong only to that conversation, active flag covers the finding |
+| POST | /api/findings/:id/conversations | `{ clientRequestId }` -> 201 new `DiscussionConversation`, 200 for a replay; no model call |
+| POST | /api/findings/:id/discussion | `{ message, clientRequestId, conversationId? }` -> 202 DiscussionTurn (omitting conversationId selects the original) for a new queued turn; 200 for an identical idempotent replay |
 | POST | /api/discussion-turns/:id/retry | `{ attempt }` -> 202 DiscussionTurn with incremented attempt |
 
 Use 400 for invalid input; 404 for an unknown finding/turn; 409 for an active reply, conflicting request ID, or invalid/stale retry; and 503 for missing provider configuration without creating work. Generation failures are persisted and surfaced through the discussion GET endpoint.
 
 ### Acceptance criteria
 
-1. Ask two follow-up questions about a finding; the second reply can use the first exchange. Two different findings never share conversation history.
+1. Ask two follow-up questions about a finding; the second reply can use the first exchange. Create a new conversation on that finding and verify its first reply has no earlier chat context. Switch back and continue the original. Different findings and different conversations never share chat history.
 2. Refresh while generating a reply and after completion. The question, progress/failure state, and saved answers remain recoverable. Restart recovery preserves history and permits retry.
 3. Accept/dismiss/reopen before or during discussion. Conversation history, code, and review state remain intact.
 4. Double-submit the same request ID and test a lost-response retry. Only one turn and one provider call are created. A different simultaneous question is rejected while a reply is active.

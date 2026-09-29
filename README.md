@@ -41,7 +41,7 @@ Then open http://127.0.0.1:3001. The Python API serves the built React applicati
 | `npm start` | Serve the built application and API |
 | `npm run check` | Run typecheck, tests, and build |
 
-For browser tests, install the test browser once with `npx playwright install chromium`, then run `npm run test:e2e`. These tests use a temporary SQLite database and deterministic providers on port 3032; no OpenAI key or API calls are used.
+For browser tests, install the test browser once with `npx playwright install chromium`, then run `npm run test:e2e`. These tests use a temporary SQLite database and deterministic providers on port 3032; no OpenAI key or API calls are used. If the default test port is occupied, use `E2E_PORT=3037 npm run test:e2e` to run on an isolated alternate port.
 
 ## Architecture
 
@@ -53,7 +53,7 @@ React + TypeScript + Vite ── /api ── FastAPI + Pydantic ── SQLite fi
 - FastAPI exposes the implemented API schema at `/openapi.json` and interactive docs at `/docs`. Pydantic is the source of truth for backend domain validation. Frontend API types are generated from OpenAPI with `npm run api:types` and committed in `src/shared/api-types.ts`. Regenerate them after changing endpoint models.
 - SQLite uses Python's standard `sqlite3` module, avoiding a separate database service and native Node addons. Connections are scoped to each operation. Reads use regular FastAPI handlers; asynchronous task runners perform short SQLite transactions before and after provider calls.
 - Numbered SQL migrations are transactional and recorded with checksums. Applied migrations are immutable; add a new file for a schema change.
-- `Snippet`, `ReviewRun`, `Finding`, and `DiscussionTurn` have separate persistence and lifecycles. Partial unique indexes prevent two active reviews per snippet or two active replies per finding; request IDs deduplicate question submissions.
+- `Snippet`, `ReviewRun`, `Finding`, `DiscussionConversation`, and `DiscussionTurn` have separate persistence and lifecycles. Partial unique indexes prevent two active reviews per snippet or two active replies per finding; request IDs deduplicate question submissions.
 - SQL constraints protect persisted enum values, foreign keys, review state shape, and basic line ranges. Pydantic validation additionally checks line references against the actual code.
 - `package-lock.json` and `uv.lock` pin dependencies. The production startup serves the React build from one Python backend process.
 
@@ -87,7 +87,7 @@ See [data and API contracts](docs/data-contract.md) for invariants and implement
 
 Default model: [`gpt-4.1-mini`](https://developers.openai.com/api/docs/models/gpt-4.1-mini), configurable through `.env`. Responses and severity judgments remain model-generated suggestions; broader quality evaluation and severity calibration are future work.
 
-Validation: 72 automated backend/grader/annotation tests and 16 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
+Validation: 77 automated backend/grader/annotation tests and 20 desktop/narrow browser workflow cases (mocked provider, no API cost), frontend typecheck/build, a successful real provider smoke test, and a browser-triggered real review of a synthetic averaging function. The real review found a division-by-zero edge case on line 2. The test suite currently emits one upstream Starlette/httpx deprecation warning.
 
 ## Finding interaction
 
@@ -100,8 +100,10 @@ Validation: 72 automated backend/grader/annotation tests and 16 desktop/narrow b
 ## Finding discussion
 
 - Choose **Discuss with AI** on any finding, including accepted or dismissed ones. A wide discussion workspace opens below the code and findings; closing it restores keyboard focus and retains the draft in session storage when available. Ask a question or follow up on a previous answer. The UI shows queued/running progress, disables that composer while generating, and polls every two seconds. Other finding actions remain available.
-- Each request includes the full numbered snippet, the selected finding, and up to 10 recent successful exchanges from that finding only. All exchanges remain saved locally. The implementation follows OpenAI's [manual conversation history](https://developers.openai.com/api/docs/guides/conversation-state) approach; it uses plain text, no streaming, `store=False`, and a 1,500-token reply limit.
-- **Retry reply** retries the latest failed turn in place. Earlier failed questions can be copied into the composer with **Use question again**. Failures stay visible but are excluded from AI context. Retries preserve question IDs and increment an attempt number; stale completions cannot overwrite a newer attempt.
+- **New conversation** opens an independent conversation for the same finding; use the **Conversation** selector to revisit earlier ones. New conversations still receive the snippet and finding, but no earlier chat history. Creating an empty conversation makes no model call. Existing chats become Conversation 1, and their message IDs/content are preserved. Unsent drafts and uncertain submissions are stored separately for each conversation; selection survives reload in the same tab. If creation loses its response, **Check new conversation** recovers the same conversation rather than creating another.
+- Wait for a finding's active reply to finish before creating a conversation or sending another question on that finding. You may switch conversations to read them while a reply is running. This keeps the existing one-active-reply-per-finding limit and shared two-call concurrency budget.
+- Each request includes the full numbered snippet, the selected finding, and up to 10 recent successful exchanges from the selected conversation only. Other conversations on the same finding do not enter its context. All exchanges remain saved locally. The implementation follows OpenAI's [manual conversation history](https://developers.openai.com/api/docs/guides/conversation-state) approach; it uses plain text, no streaming, `store=False`, and a 1,500-token reply limit.
+- **Retry reply** retries the latest failed turn in the selected conversation in place. Earlier failed questions can be copied into the composer with **Use question again**. Failures stay visible but are excluded from AI context. Retries preserve question IDs and increment an attempt number; stale completions cannot overwrite a newer attempt.
 - A client request ID prevents duplicate submissions. An uncertain submission keeps its exact question and ID in session storage (or memory if storage is unavailable). After a lost response or reload, **Check submission** recovers the persisted turn without making another AI call. Explicit provider retries are separate from submission recovery.
 - Resolution changes do not affect conversation history, and replies cannot change source code or finding status. A new review creates new findings with empty conversations; older conversations remain accessible through the review-history selector and API.
 - Shutdown/startup recovery marks interrupted replies failed without losing saved questions. The same configured timeout bounds both queue wait and generation. Only one backend process may own a database.

@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
+  formatDate,
   request,
   useResource,
   type DiscussionDetail,
   type DiscussionTurn,
 } from "./api";
+
+import type { components } from "../shared/api-types";
+type ConversationRecord = components["schemas"]["DiscussionConversation"];
 
 type Submission = { message: string; clientRequestId: string };
 const isActive = (turn: DiscussionTurn) =>
@@ -24,8 +28,188 @@ function readPending(key: string): Submission | null {
   }
 }
 
+function readId(key: string): string | null {
+  try {
+    const value = sessionStorage.getItem(key);
+    return value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        value,
+      )
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function Discussion({ findingId }: { findingId: string }) {
-  const storageKey = `discussion-pending:${findingId}`;
+  const selectedKey = `discussion-selected:${findingId}`;
+  const creationKey = `discussion-create:${findingId}`;
+  const [selected, setSelected] = useState(
+    () => readId(selectedKey) ?? findingId,
+  );
+  const [pendingCreate, setPendingCreate] = useState<string | null>(() =>
+    readId(creationKey),
+  );
+  const [creating, setCreating] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [creationError, setCreationError] = useState("");
+  const creationInFlight = useRef(false);
+  const path = `/findings/${findingId}/discussion${selected === findingId ? "" : `?conversationId=${encodeURIComponent(selected)}`}`;
+  const {
+    data,
+    error,
+    retry: refresh,
+  } = useResource<DiscussionDetail>(path, (data) => data.hasActiveReply);
+  function select(id: string) {
+    setSelected(id);
+    try {
+      sessionStorage.setItem(selectedKey, id);
+    } catch {
+      /* Current selection remains in memory. */
+    }
+  }
+  function rememberCreation(id: string | null) {
+    setPendingCreate(id);
+    try {
+      if (id) sessionStorage.setItem(creationKey, id);
+      else sessionStorage.removeItem(creationKey);
+    } catch {
+      /* In-memory recovery is still available. */
+    }
+  }
+  async function newConversation() {
+    if (creationInFlight.current || sending) return;
+    creationInFlight.current = true;
+    setCreating(true);
+    setCreationError("");
+    const requestId = pendingCreate ?? crypto.randomUUID();
+    rememberCreation(requestId);
+    try {
+      const conversation = await request<ConversationRecord>(
+        `/findings/${findingId}/conversations`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientRequestId: requestId }),
+        },
+      );
+      rememberCreation(null);
+      select(conversation.id);
+      refresh();
+    } catch (error) {
+      if (error instanceof ApiError && error.status < 500)
+        rememberCreation(null);
+      setCreationError(
+        error instanceof Error
+          ? error.message
+          : "Could not start a conversation.",
+      );
+    } finally {
+      creationInFlight.current = false;
+      setCreating(false);
+    }
+  }
+  return (
+    <div className="conversation-workspace">
+      <div className="conversation-toolbar">
+        <label>
+          Conversation
+          <select
+            aria-label="Conversation"
+            value={selected}
+            disabled={!data || creating || sending || !!pendingCreate}
+            onChange={(event) => select(event.target.value)}
+          >
+            {data ? (
+              data.conversations.map((conversation, index) => (
+                <option key={conversation.id} value={conversation.id}>
+                  Conversation {index + 1} ·{" "}
+                  {formatDate(conversation.createdAt)}
+                </option>
+              ))
+            ) : (
+              <option value={selected}>Loading conversation…</option>
+            )}
+          </select>
+        </label>
+        <button
+          className="secondary"
+          disabled={
+            creating ||
+            sending ||
+            (!pendingCreate && (!data || data.hasActiveReply))
+          }
+          onClick={() => void newConversation()}
+        >
+          {creating
+            ? "Opening…"
+            : pendingCreate
+              ? "Check new conversation"
+              : "New conversation"}
+        </button>
+      </div>
+      <p className="muted small">
+        New conversations start without earlier chat history. Your code, this
+        finding, and all previous conversations are kept.
+      </p>
+      {data?.hasActiveReply && (
+        <p className="muted small">
+          Wait for this finding’s current reply to finish before starting
+          another conversation or question.
+        </p>
+      )}
+      {creationError && (
+        <p className="review-error" role="alert">
+          {creationError}
+        </p>
+      )}
+      {pendingCreate && !creating && (
+        <p className="muted small">
+          Creation is not yet confirmed. Check new conversation to recover the
+          same conversation without duplicating it.
+        </p>
+      )}
+      {error && selected !== findingId && (
+        <button className="text-button" onClick={() => select(findingId)}>
+          Open original conversation
+        </button>
+      )}
+      <Conversation
+        key={selected}
+        findingId={findingId}
+        conversationId={selected}
+        data={data}
+        error={error}
+        refresh={refresh}
+        onBusyChange={setSending}
+        locked={creating || !!pendingCreate}
+      />
+    </div>
+  );
+}
+
+function Conversation({
+  findingId,
+  conversationId,
+  data,
+  error,
+  refresh,
+  onBusyChange,
+  locked,
+}: {
+  findingId: string;
+  conversationId: string;
+  data?: DiscussionDetail;
+  error?: string;
+  refresh: () => void;
+  onBusyChange: (busy: boolean) => void;
+  locked: boolean;
+}) {
+  // Keep original keys for old drafts and pending submissions after the migration.
+  const scope =
+    conversationId === findingId ? findingId : `${findingId}:${conversationId}`;
+  const storageKey = `discussion-pending:${scope}`;
   const [pending, setPending] = useState<Submission | null>(() =>
     readPending(storageKey),
   );
@@ -33,7 +217,7 @@ export function Discussion({ findingId }: { findingId: string }) {
     try {
       return (
         pending?.message ??
-        sessionStorage.getItem(`discussion-draft:${findingId}`) ??
+        sessionStorage.getItem(`discussion-draft:${scope}`) ??
         ""
       );
     } catch {
@@ -42,25 +226,19 @@ export function Discussion({ findingId }: { findingId: string }) {
   });
   useEffect(() => {
     try {
-      if (message)
-        sessionStorage.setItem(`discussion-draft:${findingId}`, message);
-      else sessionStorage.removeItem(`discussion-draft:${findingId}`);
+      if (message) sessionStorage.setItem(`discussion-draft:${scope}`, message);
+      else sessionStorage.removeItem(`discussion-draft:${scope}`);
     } catch {
       /* Draft persistence is best effort when storage is unavailable. */
     }
-  }, [findingId, message]);
+  }, [scope, message]);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const inFlight = useRef(false);
   const composer = useRef<HTMLTextAreaElement>(null);
   const historyList = useRef<HTMLOListElement>(null);
   const path = `/findings/${findingId}/discussion`;
-  const {
-    data,
-    error,
-    retry: refresh,
-  } = useResource<DiscussionDetail>(path, (data) => data.turns.some(isActive));
-  const active = data?.turns.some(isActive) ?? false;
+  const active = data?.hasActiveReply ?? false;
   const latest = data?.turns.at(-1);
 
   useEffect(() => {
@@ -95,9 +273,11 @@ export function Discussion({ findingId }: { findingId: string }) {
   }, [data, pending]);
 
   async function send() {
-    if (inFlight.current || (!pending && (active || !message.trim()))) return;
+    if (locked || inFlight.current || (!pending && (active || !message.trim())))
+      return;
     inFlight.current = true;
     setBusy(true);
+    onBusyChange(true);
     setActionError("");
     const submission = pending ?? {
       message,
@@ -108,7 +288,7 @@ export function Discussion({ findingId }: { findingId: string }) {
       await request<DiscussionTurn>(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(submission),
+        body: JSON.stringify({ ...submission, conversationId }),
       });
       remember(null);
       setMessage("");
@@ -129,13 +309,15 @@ export function Discussion({ findingId }: { findingId: string }) {
       refresh();
       inFlight.current = false;
       setBusy(false);
+      onBusyChange(false);
     }
   }
 
   async function retryTurn(turn: DiscussionTurn) {
-    if (inFlight.current || active || pending) return;
+    if (locked || inFlight.current || active || pending) return;
     inFlight.current = true;
     setBusy(true);
+    onBusyChange(true);
     setActionError("");
     try {
       await request<DiscussionTurn>(`/discussion-turns/${turn.id}/retry`, {
@@ -152,6 +334,7 @@ export function Discussion({ findingId }: { findingId: string }) {
       refresh();
       inFlight.current = false;
       setBusy(false);
+      onBusyChange(false);
     }
   }
 
@@ -159,7 +342,8 @@ export function Discussion({ findingId }: { findingId: string }) {
     <section className="discussion" aria-label="Finding discussion">
       <p className="discussion-help">
         Ask about this finding. OpenAI receives the snippet, finding, and your
-        most recent 10 completed exchanges. Replies do not change your code.
+        most recent 10 completed exchanges from this conversation only. Replies
+        do not change your code.
       </p>
       {!data && !error && (
         <p role="status" className="muted">
@@ -210,7 +394,7 @@ export function Discussion({ findingId }: { findingId: string }) {
                   {index === data.turns.length - 1 ? (
                     <button
                       className="secondary"
-                      disabled={busy || active || !!pending}
+                      disabled={locked || busy || active || !!pending}
                       onClick={() => retryTurn(turn)}
                     >
                       Retry reply
@@ -218,7 +402,7 @@ export function Discussion({ findingId }: { findingId: string }) {
                   ) : (
                     <button
                       className="text-button"
-                      disabled={busy || active || !!pending}
+                      disabled={locked || busy || active || !!pending}
                       onClick={() => {
                         setMessage(turn.userMessage);
                         composer.current?.focus();
@@ -244,7 +428,7 @@ export function Discussion({ findingId }: { findingId: string }) {
             We haven’t confirmed whether your question was saved. Check again to
             recover it without sending a duplicate.
           </p>
-          <button className="secondary" onClick={send}>
+          <button className="secondary" disabled={locked} onClick={send}>
             Check submission
           </button>
         </div>
@@ -261,7 +445,7 @@ export function Discussion({ findingId }: { findingId: string }) {
           ref={composer}
           rows={3}
           value={message}
-          disabled={busy || active || !!pending || !data}
+          disabled={locked || busy || active || !!pending || !data}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="Why is this a problem?"
           aria-describedby={`question-limit-${findingId}`}
@@ -279,6 +463,7 @@ export function Discussion({ findingId }: { findingId: string }) {
             className="primary"
             type="submit"
             disabled={
+              locked ||
               busy ||
               active ||
               !!pending ||

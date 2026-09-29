@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
+const testPort = Number(process.env.E2E_PORT ?? "3032");
+if (!Number.isInteger(testPort) || testPort < 1 || testPort > 65535)
+  throw new Error("Invalid E2E_PORT");
+
 export default defineConfig({
   testDir: "./tests/browser",
   timeout: 30_000,
@@ -7,7 +11,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   use: {
-    baseURL: "http://127.0.0.1:3032",
+    baseURL: `http://127.0.0.1:${testPort}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -23,8 +27,8 @@ export default defineConfig({
   ],
   webServer: {
     command: "uv run --locked python tests/e2e_server.py",
-    env: { PYTHONPATH: ".", OPENAI_API_KEY: "" },
-    url: "http://127.0.0.1:3032/api/health",
+    env: { PYTHONPATH: ".", OPENAI_API_KEY: "", E2E_PORT: String(testPort) },
+    url: `http://127.0.0.1:${testPort}/api/health`,
     reuseExistingServer: false,
     timeout: 20_000,
   },

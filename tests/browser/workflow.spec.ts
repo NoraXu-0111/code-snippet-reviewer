@@ -202,3 +202,87 @@ test("sample form protects drafts, wide conversation fits viewport and keyboard 
     page.getByRole("button", { name: "Discuss with AI" }),
   ).toBeFocused();
 });
+
+test("same finding supports independent conversations, drafts and reload selection", async ({
+  page,
+}) => {
+  await create(page);
+  await review(page);
+  await discuss(page);
+  const composer = page.getByLabel("Ask a follow-up", { exact: true });
+  await composer.fill("Original question");
+  await page.getByRole("button", { name: "Send question" }).click();
+  await expect(
+    page.getByText("Answer with 0 earlier exchanges.", { exact: false }),
+  ).toBeVisible();
+  const selector = page.getByRole("combobox", {
+    name: "Conversation",
+    exact: true,
+  });
+  const original = await selector.inputValue();
+  await composer.fill("Unsent original draft");
+  await page
+    .getByRole("button", { name: "New conversation", exact: true })
+    .click();
+  await expect(selector.locator("option")).toHaveCount(2);
+  const second = await selector.inputValue();
+  expect(second).not.toBe(original);
+  await expect(page.locator(".chat-user")).toHaveCount(0);
+  await expect(composer).toHaveValue("");
+  await composer.fill("Fresh question");
+  await page.getByRole("button", { name: "Send question" }).click();
+  await expect(
+    page.getByText("Answer with 0 earlier exchanges.", { exact: false }),
+  ).toBeVisible();
+  await composer.fill("Follow up fresh");
+  await page.getByRole("button", { name: "Send question" }).click();
+  await expect(
+    page.getByText("Answer with 1 earlier exchanges.", { exact: false }),
+  ).toBeVisible();
+  await page.reload();
+  await discuss(page);
+  await expect(selector).toHaveValue(second);
+  await expect(page.locator(".chat-user")).toHaveCount(2);
+  await composer.fill("Unsent second draft");
+  await selector.selectOption(original);
+  await expect(page.locator(".chat-user")).toHaveCount(1);
+  await expect(composer).toHaveValue("Unsent original draft");
+  await selector.selectOption(second);
+  await expect(composer).toHaveValue("Unsent second draft");
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(page.locator(".chat-user")).toHaveCount(2);
+});
+
+test("lost new conversation response recovers one conversation after reload", async ({
+  page,
+}) => {
+  await create(page);
+  await review(page);
+  await discuss(page);
+  let lost = false;
+  await page.route("**/api/findings/*/conversations", async (route) => {
+    if (!lost && route.request().method() === "POST") {
+      await route.fetch();
+      lost = true;
+      await route.abort();
+    } else await route.continue();
+  });
+  await page
+    .getByRole("button", { name: "New conversation", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Check new conversation" }),
+  ).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Discuss with AI" }).click();
+  await page.getByRole("button", { name: "Check new conversation" }).click();
+  const selector = page.getByRole("combobox", {
+    name: "Conversation",
+    exact: true,
+  });
+  await expect(selector.locator("option")).toHaveCount(2);
+  await expect(page.locator(".chat-user")).toHaveCount(0);
+  await expect(
+    page.getByLabel("Ask a follow-up", { exact: true }),
+  ).toBeEnabled();
+});

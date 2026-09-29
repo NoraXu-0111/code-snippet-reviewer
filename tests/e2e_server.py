@@ -1,5 +1,6 @@
 """Only used by Playwright. Real API/SQLite with deterministic, keyless providers."""
 import asyncio
+import os
 import tempfile
 from pathlib import Path
 
@@ -47,4 +48,4 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='snippet-reviewer-e2e-') as directory:
         settings = Settings(database_path=Path(directory)/'test.db', serve_client=True, openai_api_key=None)
         app = create_app(settings, reviewer=Reviewer(), discussion_provider=Discussion())
-        uvicorn.run(app,host='127.0.0.1',port=3032)
+        uvicorn.run(app,host='127.0.0.1',port=int(os.getenv('E2E_PORT', '3032')))

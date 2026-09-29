@@ -126,6 +126,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/findings/{finding_id}/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** New Conversation */
+    post: operations["new_conversation_api_findings__finding_id__conversations_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/discussion-turns/{turn_id}/retry": {
     parameters: {
       query?: never;
@@ -328,8 +345,18 @@ export interface components {
        */
       notes: string;
     };
+    /** CreateConversation */
+    CreateConversation: {
+      /**
+       * Clientrequestid
+       * Format: uuid
+       */
+      clientRequestId: string;
+    };
     /** CreateDiscussionTurn */
     CreateDiscussionTurn: {
+      /** Conversationid */
+      conversationId?: string | null;
       /** Message */
       message: string;
       /**
@@ -347,8 +374,35 @@ export interface components {
       /** Code */
       code: string;
     };
+    /** DiscussionConversation */
+    DiscussionConversation: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Findingid
+       * Format: uuid
+       */
+      findingId: string;
+      /**
+       * Createdat
+       * Format: date-time
+       */
+      createdAt: string;
+    };
     /** DiscussionDetail */
     DiscussionDetail: {
+      /**
+       * Conversationid
+       * Format: uuid
+       */
+      conversationId: string;
+      /** Conversations */
+      conversations: components["schemas"]["DiscussionConversation"][];
+      /** Hasactivereply */
+      hasActiveReply: boolean;
       /** Turns */
       turns: components["schemas"]["DiscussionTurn"][];
     };
@@ -366,6 +420,11 @@ export interface components {
       finishedAt?: string | null;
       /** Error */
       error?: string | null;
+      /**
+       * Conversationid
+       * Format: uuid
+       */
+      conversationId: string;
       /**
        * Id
        * Format: uuid
@@ -1146,7 +1205,9 @@ export interface operations {
   };
   discussion_detail_api_findings__finding_id__discussion_get: {
     parameters: {
-      query?: never;
+      query?: {
+        conversationId?: string | null;
+      };
       header?: never;
       path: {
         finding_id: string;
@@ -1260,6 +1321,77 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  new_conversation_api_findings__finding_id__conversations_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        finding_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateConversation"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiscussionConversation"];
+        };
+      };
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiscussionConversation"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

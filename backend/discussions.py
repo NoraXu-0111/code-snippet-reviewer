@@ -5,7 +5,7 @@ from contextlib import closing
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from .contracts import CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, Finding, ReviewStatus, Snippet
+from .contracts import CreateDiscussionTurn, DiscussionConversation, DiscussionDetail, DiscussionTurn, Finding, ReviewStatus, Snippet
 from .database import open_database
 from .discussion_provider import DiscussionFailure, DiscussionProvider
 from .reviews import now
@@ -20,11 +20,47 @@ class DiscussionNotConfigured(Exception):
     pass
 
 
-def get_discussion(db: sqlite3.Connection, finding_id: UUID | str) -> DiscussionDetail:
+def ensure_default_conversation(db: sqlite3.Connection, finding_id: UUID | str) -> None:
     if db.execute("SELECT 1 FROM findings WHERE id = ?", (str(finding_id),)).fetchone() is None:
         raise LookupError("Finding not found")
-    rows = db.execute("SELECT * FROM discussion_turns WHERE finding_id = ? ORDER BY created_at, rowid", (str(finding_id),))
-    return DiscussionDetail(turns=[DiscussionTurn.model_validate(dict(row)) for row in rows])
+    # Original conversation uses the finding ID. This keeps old clients/drafts stable.
+    db.execute("INSERT OR IGNORE INTO discussion_conversations (id, finding_id, created_at) VALUES (?, ?, ?)",
+               (str(finding_id), str(finding_id), now()))
+
+
+def get_discussion(db: sqlite3.Connection, finding_id: UUID | str, conversation_id: UUID | str | None = None) -> DiscussionDetail:
+    ensure_default_conversation(db, finding_id)
+    selected = str(conversation_id or finding_id)
+    if db.execute("SELECT 1 FROM discussion_conversations WHERE id=? AND finding_id=?", (selected, str(finding_id))).fetchone() is None:
+        raise LookupError("Conversation not found for this finding")
+    conversations = db.execute("SELECT * FROM discussion_conversations WHERE finding_id=? ORDER BY created_at, rowid", (str(finding_id),)).fetchall()
+    rows = db.execute("SELECT * FROM discussion_turns WHERE conversation_id = ? ORDER BY created_at, rowid", (selected,))
+    active = db.execute("SELECT 1 FROM discussion_turns WHERE finding_id=? AND status IN ('queued','running')", (str(finding_id),)).fetchone()
+    return DiscussionDetail(conversation_id=selected, conversations=[DiscussionConversation.model_validate(dict(row)) for row in conversations],
+                            has_active_reply=active is not None, turns=[DiscussionTurn.model_validate(dict(row)) for row in rows])
+
+
+def create_conversation(db: sqlite3.Connection, finding_id: UUID, request_id: UUID) -> tuple[DiscussionConversation, bool]:
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        ensure_default_conversation(db, finding_id)
+        existing = db.execute("SELECT * FROM discussion_conversations WHERE id=?", (str(request_id),)).fetchone()
+        if existing:
+            if existing['finding_id'] != str(finding_id):
+                raise DiscussionConflict("This conversation request ID belongs to another finding.")
+            db.commit()
+            return DiscussionConversation.model_validate(dict(existing)), False
+        if db.execute("SELECT 1 FROM findings WHERE id=?", (str(request_id),)).fetchone():
+            raise DiscussionConflict("This request ID is reserved for an original finding conversation.")
+        if db.execute("SELECT 1 FROM discussion_turns WHERE finding_id=? AND status IN ('queued','running')", (str(finding_id),)).fetchone():
+            raise DiscussionConflict("Wait for the current reply to finish before starting a new conversation.")
+        conversation = DiscussionConversation(id=request_id, finding_id=finding_id, created_at=now())
+        db.execute("INSERT INTO discussion_conversations VALUES (?,?,?)", (str(request_id),str(finding_id),conversation.created_at.isoformat()))
+        db.commit()
+        return conversation, True
+    except Exception:
+        db.rollback()
+        raise
 
 
 def load_context(db: sqlite3.Connection, turn: DiscussionTurn) -> tuple[Snippet, Finding, list[DiscussionTurn]]:
@@ -34,9 +70,9 @@ def load_context(db: sqlite3.Connection, turn: DiscussionTurn) -> tuple[Snippet,
         (str(finding.review_run_id),),
     ).fetchone()))
     rows = db.execute("""SELECT * FROM discussion_turns
-        WHERE finding_id = ? AND status = 'succeeded'
+        WHERE conversation_id = ? AND status = 'succeeded'
         AND (created_at, rowid) < (SELECT created_at, rowid FROM discussion_turns WHERE id = ?)
-        ORDER BY created_at DESC, rowid DESC LIMIT 10""", (str(turn.finding_id), str(turn.id))).fetchall()
+        ORDER BY created_at DESC, rowid DESC LIMIT 10""", (str(turn.conversation_id), str(turn.id))).fetchall()
     return snippet, finding, [DiscussionTurn.model_validate(dict(row)) for row in reversed(rows)]
 
 
@@ -58,25 +94,27 @@ class DiscussionService:
             # Serialize replay lookup, active check, and insert, even across connections.
             db.execute("BEGIN IMMEDIATE")
             try:
-                if db.execute("SELECT 1 FROM findings WHERE id = ?", (str(finding_id),)).fetchone() is None:
-                    raise LookupError("Finding not found")
+                ensure_default_conversation(db, finding_id)
+                conversation_id = payload.conversation_id or finding_id
+                if db.execute("SELECT 1 FROM discussion_conversations WHERE id=? AND finding_id=?", (str(conversation_id),str(finding_id))).fetchone() is None:
+                    raise LookupError("Conversation not found for this finding")
                 existing = db.execute("SELECT * FROM discussion_turns WHERE finding_id = ? AND client_request_id = ?",
                                       (str(finding_id), str(payload.client_request_id))).fetchone()
                 if existing:
-                    if existing["user_message"] != payload.message:
-                        raise DiscussionConflict("This request ID was already used for a different question.")
+                    if existing["user_message"] != payload.message or existing["conversation_id"] != str(conversation_id):
+                        raise DiscussionConflict("This request ID was already used for a different question or conversation.")
                     db.commit()
                     return DiscussionTurn.model_validate(dict(existing)), False
                 if db.execute("SELECT 1 FROM discussion_turns WHERE finding_id = ? AND status IN ('queued', 'running')", (str(finding_id),)).fetchone():
                     raise DiscussionConflict("This finding already has a reply in progress. Refresh the conversation.")
                 if not self.configured:
                     raise DiscussionNotConfigured()
-                turn = DiscussionTurn(id=uuid4(), finding_id=finding_id, client_request_id=payload.client_request_id,
+                turn = DiscussionTurn(id=uuid4(), finding_id=finding_id, conversation_id=conversation_id, client_request_id=payload.client_request_id,
                                       user_message=payload.message, status=ReviewStatus.QUEUED, attempt=1, created_at=now())
                 db.execute("""INSERT INTO discussion_turns
-                    (id, finding_id, client_request_id, user_message, status, attempt, created_at)
-                    VALUES (?, ?, ?, ?, 'queued', 1, ?)""",
-                    (str(turn.id), str(finding_id), str(payload.client_request_id), turn.user_message, turn.created_at.isoformat()))
+                    (id, finding_id, conversation_id, client_request_id, user_message, status, attempt, created_at)
+                    VALUES (?, ?, ?, ?, ?, 'queued', 1, ?)""",
+                    (str(turn.id), str(finding_id), str(conversation_id), str(payload.client_request_id), turn.user_message, turn.created_at.isoformat()))
                 db.commit()
             except Exception:
                 db.rollback()
@@ -91,9 +129,11 @@ class DiscussionService:
                 row = db.execute("SELECT * FROM discussion_turns WHERE id = ?", (str(turn_id),)).fetchone()
                 if row is None:
                     raise LookupError("Discussion turn not found")
-                latest = db.execute("SELECT id FROM discussion_turns WHERE finding_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1", (row["finding_id"],)).fetchone()
+                latest = db.execute("SELECT id FROM discussion_turns WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1", (row["conversation_id"],)).fetchone()
                 if row["status"] != "failed" or row["attempt"] != attempt or latest["id"] != str(turn_id):
                     raise DiscussionConflict("Only the latest failed reply can be retried at its current attempt. Refresh the conversation.")
+                if db.execute("SELECT 1 FROM discussion_turns WHERE finding_id=? AND status IN ('queued','running')", (row['finding_id'],)).fetchone():
+                    raise DiscussionConflict("This finding already has a reply in progress. Wait for it to finish.")
                 if not self.configured:
                     raise DiscussionNotConfigured()
                 updated = db.execute("""UPDATE discussion_turns SET status = 'queued', attempt = attempt + 1,

@@ -24,4 +24,6 @@ Final verification and a short demo are recorded in [verification.md](verificati
 
 13. **Human annotation workflow (completed):** staged independent inspection/reference validation/output assessment, frozen evaluation evidence, persisted drafts and revision conflicts, progress and full JSON export; selectable judgments/reasons with optional notes following user feedback. No automatic promotion to gold labels or new provider calls.
 
+14. **Independent conversations per finding (completed):** New conversation and history selector, preserved original chats, conversation-scoped context/drafts/retries, idempotent creation recovery, migration and browser regression coverage.
+
 These improvements were explicitly requested after the original MVP. They are additional scope, not a claim that the original time estimate included all of this work.

@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import PROJECT_ROOT, Settings, get_settings
 from .contracts import CreateSnippet, DashboardStatus, ErrorResponse, Finding, HealthResponse, ReviewDetail, ReviewRun, Snippet, SnippetDetail, SnippetList, UpdateFinding
-from .contracts import CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, RetryDiscussionTurn, ReviewHistory
+from .contracts import CreateConversation, DiscussionConversation, CreateDiscussionTurn, DiscussionDetail, DiscussionTurn, RetryDiscussionTurn, ReviewHistory
 from .database import open_database
 from .tracing import recover_traces
 from . import findings, snippets
@@ -19,7 +19,7 @@ from .quality import quality_router
 from .reviewer import OpenAIReviewer, Reviewer
 from .reviews import ActiveReviewError, ReviewService, get_review
 from .discussion_provider import DiscussionProvider, OpenAIDiscussionProvider
-from .discussions import DiscussionConflict, DiscussionNotConfigured, DiscussionService, get_discussion
+from .discussions import DiscussionConflict, DiscussionNotConfigured, DiscussionService, get_discussion, create_conversation
 
 
 def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = None,
@@ -140,10 +140,21 @@ def create_app(settings: Settings | None = None, *, reviewer: Reviewer | None = 
 
     @app.get("/api/findings/{finding_id}/discussion", response_model=DiscussionDetail,
              responses={404: {"model": ErrorResponse}})
-    def discussion_detail(finding_id: UUID) -> DiscussionDetail:
+    def discussion_detail(finding_id: UUID, conversation_id: Annotated[UUID | None, Query(alias="conversationId")] = None) -> DiscussionDetail:
         with closing(open_database(settings.database_path, migrate=False)) as db:
             try:
-                return get_discussion(db, finding_id)
+                return get_discussion(db, finding_id, conversation_id)
+            except LookupError as exc:
+                raise HTTPException(404, str(exc)) from None
+
+    @app.post("/api/findings/{finding_id}/conversations", response_model=DiscussionConversation, status_code=201,
+              responses={200: {"model": DiscussionConversation}, 400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}})
+    def new_conversation(finding_id: UUID, payload: CreateConversation, response: Response) -> DiscussionConversation:
+        with closing(open_database(settings.database_path, migrate=False)) as db:
+            try:
+                conversation, created = create_conversation(db, finding_id, payload.client_request_id)
+                response.status_code = 201 if created else 200
+                return conversation
             except LookupError as exc:
                 raise HTTPException(404, str(exc)) from None
 
